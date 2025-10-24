@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>YouTube Subtitles Generator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      /* Root variables for consistent styling */
+      :root {
+        --radius: 0.5rem;
+        --input-padding: 0.5rem 0.75rem;
+        --font-size: 14px;
+        --bg: #ffffff;
+        --text: #111827;
+        --muted: #6b7280;
+        --border: #d1d5db;
+        --primary: #ef4444;
+        --primary-hover: #dc2626;
+      }
+
+      /* General body styling */
+      body {
+        width: 300px;
+        padding: 16px;
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+      }
+
+      /* Container for layout */
+      .container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      /* Header styling */
+      h2 {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0;
+      }
+
+      /* Label styling */
+      label {
+        font-size: var(--font-size);
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+
+      /* Input field styling */
+      input {
+        padding: var(--input-padding);
+        font-size: var(--font-size);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        outline: none;
+        width: 100%;
+        box-sizing: border-box;
+        transition: border-color 0.2s, box-shadow 0.2s;
+      }
+
+      /* Input focus styling */
+      input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+      }
+
+      /* Button styling */
+      button {
+        background-color: var(--primary);
+        color: white;
+        font-size: var(--font-size);
+        font-weight: 500;
+        padding: 10px 16px;
+        border: none;
+        border-radius: var(--radius);
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      /* Button hover effect */
+      button:hover {
+        background-color: var(--primary-hover);
+      }
+
+      /* Status message styling */
+      .status {
+        font-size: var(--font-size);
+        color: var(--muted);
+        margin-top: 4px;
+      }
+
+      /* Existing subtitles message styling */
+      .existing-subtitles {
+        font-size: var(--font-size);
+        color: green;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Main container for the popup -->
+    <div class="container">
+      <!-- Header -->
+      <h2>YouTube Subtitles Generator</h2>
+
+      <!-- Input for Gemini API Key -->
+      <div>
+        <label for="apiKey">Gemini API Key</label>
+        <input
+          type="password"
+          id="apiKey"
+          placeholder="Enter your Gemini API Key"
+        />
+      </div>
+
+      <!-- Generate Subtitles Button -->
+      <button id="generateBtn">Generate Caption Closed</button>
+
+      <!-- Message for existing subtitles -->
+      <div class="existing-subtitles" id="existingSubtitles"></div>
+
+      <!-- Status message -->
+      <div class="status" id="status"></div>
+    </div>
+
+    <!-- Link to the popup.js script -->
+    <script src="popup.js"></script>
+  </body>
+</html>

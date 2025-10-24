@@ -1,0 +1,27 @@
+{
+    "manifest_version": 3,
+    "name": "YouTube Subtitles Generator",
+    "version": "1.0",
+    "description": "Generate subtitles for YouTube videos using Gemini AI",
+    "permissions": ["activeTab", "storage", "scripting"],
+    "host_permissions": ["https://*.youtube.com/*"],
+    "action": {
+      "default_popup": "popup.html",
+      "default_icon": {
+        "16": "images/16.png",
+        "48": "images/48.png",
+        "128": "images/128.png"
+      }
+    },
+    "background": {
+      "service_worker": "background.js"
+    },
+    "content_scripts": [
+      {
+        "matches": ["https://*.youtube.com/*"],
+        "js": ["content.js"],
+        "css": ["subtitles.css"],
+        "run_at": "document_idle"
+      }
+    ]
+  }

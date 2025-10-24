@@ -1,0 +1,48 @@
+#youtube-gemini-subtitles-container {
+  /* Use ID selector */
+  position: absolute;
+  /* Adjust bottom % based on YouTube player controls height */
+  bottom: 10%; /* Percentage often works better than fixed pixels */
+  /* Or use pixels if preferred: */
+  /* bottom: 70px; */
+  left: 0;
+  width: 100%;
+  text-align: center;
+  z-index: 9999; /* Ensure it's above most elements */
+  pointer-events: none; /* Allow clicks to pass through */
+  display: none; /* Initially hidden */
+  box-sizing: border-box; /* Include padding in width calculations */
+  padding: 0 2%; /* Add some horizontal padding */
+}
+
+#youtube-gemini-subtitles-text {
+  /* Use ID selector */
+  /* display: inline-block; Removed - let container handle layout */
+  background-color: rgba(8, 8, 8, 0.75); /* Slightly darker */
+  color: white;
+  padding: 5px 10px; /* Slightly smaller padding */
+  border-radius: 3px;
+  font-size: 1.8vw; /* Responsive font size based on viewport width */
+  /* Add max font-size to prevent huge text on large screens */
+  max-font-size: 28px;
+  /* Add min font-size for readability on small screens */
+  min-font-size: 14px;
+  font-family: "YouTube Noto", Roboto, Arial, Helvetica, sans-serif; /* Match YouTube's font */
+  max-width: 80%; /* Limit width */
+  /* Text shadow for better readability */
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  line-height: 1.4; /* Improve readability for multi-line subs */
+  display: inline; /* Important: Let text wrap naturally */
+  /* White-space helps preserve intended line breaks if Gemini adds them */
+  white-space: pre-wrap;
+}
+
+/* Optional: Style adjustments for fullscreen */
+ytd-player[fullscreen] #youtube-gemini-subtitles-container {
+  bottom: 12%; /* Adjust position for fullscreen */
+}
+
+ytd-player[fullscreen] #youtube-gemini-subtitles-text {
+  font-size: 2.2vw; /* Slightly larger in fullscreen */
+  max-font-size: 36px;
+}
