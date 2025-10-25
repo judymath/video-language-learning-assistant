@@ -1,46 +1,165 @@
-// Global variables
 let currentSubtitles = [];
 let subtitleContainer = null;
 let subtitleText = null;
 let videoPlayer = null;
 let videoContainer = null;
 let checkInterval = null;
+let currentVideoId = null;
+let currentUrl = window.location.href;
 let initAttempts = 0;
 const MAX_INIT_ATTEMPTS = 10;
-let currentUrl = window.location.href;
 
-// Loads stored subtitles for the current video from local storage
-function loadStoredSubtitles() {
-  const cleanedUrl = cleanYouTubeUrl(window.location.href);
-
-  chrome.storage.local.get([cleanedUrl], (result) => {
-    if (result[cleanedUrl]) {
-      console.log("Content Script: Found stored subtitles for this video.");
-      currentSubtitles = result[cleanedUrl]; // Load stored subtitles
-      startSubtitleDisplay(); // Start displaying the subtitles
-    } else {
-      console.log("Content Script: No stored subtitles found for this video.");
-    }
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    initialize();
+    monitorUrlChanges();
   });
+} else {
+  initialize();
+  monitorUrlChanges();
 }
 
-// Cleans a YouTube URL to extract only the video ID and essential parameters
-function cleanYouTubeUrl(originalUrl) {
-  try {
-    const url = new URL(originalUrl);
-    const videoId = url.searchParams.get("v");
-    if (videoId) {
-      // Reconstruct a minimal URL
-      return `${url.protocol}//${url.hostname}${url.pathname}?v=${videoId}`;
+function initialize() {
+  console.log("YouTube Subtitles Generator: Initializing content script...");
+
+  if (!findVideoElements()) {
+    initAttempts++;
+    if (initAttempts < MAX_INIT_ATTEMPTS) {
+      console.log(`Video player not found, retrying (${initAttempts}/${MAX_INIT_ATTEMPTS})...`);
+      setTimeout(initialize, 500);
+    } else {
+      console.error("Video player not found after multiple attempts.");
     }
-  } catch (e) {
-    console.error("Error parsing URL for cleaning:", originalUrl, e);
+    return;
   }
-  // Fallback to original if cleaning fails or no 'v' param found
-  return originalUrl;
+
+  initAttempts = 0;
+
+  try {
+    const url = new URL(window.location.href);
+    currentVideoId = url.searchParams.get("v");
+    console.log("Detected video ID:", currentVideoId);
+  } catch (e) {
+    console.warn("Failed to extract video ID:", e);
+    currentVideoId = null;
+  }
+
+  createSubtitleElements();
+  loadStoredSubtitles();
+
+  // Prevent duplicate bindings
+  videoPlayer.removeEventListener("pause", handleVideoPause);
+  videoPlayer.removeEventListener("play", handleVideoPlay);
+  videoPlayer.addEventListener("pause", handleVideoPause);
+  videoPlayer.addEventListener("play", handleVideoPlay);
+
+  // Listen for messages
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === "showFloatingWindow") {
+        createFloatingPanel();
+      } else if (message.action === "generateSubtitles") {
+        handleGenerateSubtitles(message, sendResponse);
+        return true;
+      } else if (message.action === "subtitlesGenerated") {
+        handleSubtitlesGenerated(message, sendResponse);
+        return true;
+      } else if (message.action === "goToPreviousSentence") {
+        handleGoToPreviousSentence();
+        return true;
+      } else if (message.action === "showVocabulary") {
+        handleShowVocabulary();
+        return true;
+      } else if (message.action === "selectPlaybackSpeed") {
+        handleSelectPlaybackSpeed();
+        return true;
+      }
+    });
+
+  console.log("Initialization complete. Listening for messages.");
 }
 
-// Monitors URL changes on YouTube (SPA behavior)
+function createFloatingPanel() {
+  if (document.getElementById("extension-floating-panel")) return;
+
+  const panel = document.createElement("div");
+  panel.id = "extension-floating-panel";
+  panel.style.position = "fixed";
+  panel.style.top = "80px";
+  panel.style.right = "40px";
+  panel.style.width = "200px";
+  panel.style.background = "rgba(30,30,30,0.85)";
+  panel.style.border = "1px solid rgba(255,255,255,0.2)";
+  panel.style.borderRadius = "10px";
+  panel.style.color = "#fff";
+  panel.style.zIndex = "99999";
+  panel.style.padding = "10px";
+  panel.style.fontSize = "14px";
+  panel.style.fontFamily = "Arial, sans-serif";
+  panel.style.backdropFilter = "blur(5px)";
+  panel.style.userSelect = "none";
+  panel.style.cursor = "move";
+  panel.innerHTML = `
+      <div style="font-weight:bold; margin-bottom:6px; text-align:center;">语言学习助手</div>
+      <button id="btn-prev" style="
+          background:#0078ff; color:#fff; border:none; border-radius:6px;
+          padding:6px 10px; width:100%; cursor:pointer;">回到上一句</button>
+      <button id="btn-vocab" style="
+          margin-top:6px; background:#00c896; color:#fff; border:none; border-radius:6px;
+          padding:6px 10px; width:100%; cursor:pointer;">显示生词</button>
+      <button id="btn-speed" style="
+          margin-top:6px; background:#ffaa00; color:#fff; border:none; border-radius:6px;
+          padding:6px 10px; width:100%; cursor:pointer;">选择倍速</button>
+  `;
+
+
+  document.body.appendChild(panel);
+
+  // 拖拽逻辑
+  let isDragging = false, offsetX, offsetY;
+  panel.addEventListener("mousedown", (e) => {
+      isDragging = true;
+      offsetX = e.clientX - panel.offsetLeft;
+      offsetY = e.clientY - panel.offsetTop;
+  });
+  document.addEventListener("mousemove", (e) => {
+      if (isDragging) {
+          panel.style.left = e.clientX - offsetX + "px";
+          panel.style.top = e.clientY - offsetY + "px";
+          panel.style.right = "auto";
+      }
+  });
+  document.addEventListener("mouseup", () => (isDragging = false));
+
+  // 按钮事件绑定
+  panel.querySelector("#btn-prev").addEventListener("click", () => {
+      console.log("1")
+      handleGoToPreviousSentence();
+  });
+
+  panel.querySelector("#btn-vocab").addEventListener("click", () => {
+      console.log("2")
+      handleShowVocabulary();
+  });
+
+  panel.querySelector("#btn-speed").addEventListener("click", () => {
+      console.log("3")
+      handleSelectPlaybackSpeed
+  });
+} 
+
+function findVideoElements() {
+  videoPlayer = document.querySelector("video.html5-main-video");
+  if (!videoPlayer) return false;
+
+  videoContainer =
+    document.querySelector("#movie_player") ||
+    document.querySelector(".html5-video-container") ||
+    videoPlayer.parentElement;
+
+  return !!videoContainer;
+}
+
+// for SPA navigation
 function monitorUrlChanges() {
   const observer = new MutationObserver(() => {
     if (currentUrl !== window.location.href) {
@@ -49,127 +168,38 @@ function monitorUrlChanges() {
       onUrlChange();
     }
   });
-
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
-// Handles actions when the URL changes
 function onUrlChange() {
-  console.log("YouTube Subtitles Generator: Reinitializing for new video...");
-  clearSubtitles(); // Clear current subtitles
-  initialize(); // Reinitialize for the new video
+  clearSubtitles();
+  initialize();
 }
 
-// Finds video elements on the YouTube page
-function findVideoElements() {
-  videoPlayer = document.querySelector("video.html5-main-video");
-  if (!videoPlayer) return false;
-
-  // Try finding a standard container, fallback to player's parent
-  videoContainer =
-    document.querySelector("#movie_player") || // Primary target
-    document.querySelector(".html5-video-container") || // Fallback 1
-    videoPlayer.parentElement; // Fallback 2
-
-  return !!videoContainer; // Return true if both found
-}
-
-// Initializes the content script
-function initialize() {
-  console.log("YouTube Subtitles Generator: Initializing content script...");
-
-  if (!findVideoElements()) {
-    initAttempts++;
-    if (initAttempts < MAX_INIT_ATTEMPTS) {
-      console.log(
-        `Video player not found, retrying (${initAttempts}/${MAX_INIT_ATTEMPTS})...`
-      );
-      setTimeout(initialize, 500); // Retry after 500ms
+function loadStoredSubtitles() {
+  const cleanedUrl = cleanYouTubeUrl(window.location.href);
+  chrome.storage.local.get([cleanedUrl], (result) => {
+    if (result[cleanedUrl]) {
+      console.log("Found stored subtitles for this video.");
+      currentSubtitles = result[cleanedUrl];
+      startSubtitleDisplay();
     } else {
-      console.error(
-        "YouTube Subtitles Generator: Video player or container not found after multiple attempts."
-      );
-    }
-    return;
-  }
-
-  console.log("YouTube Subtitles Generator: Video player found.", videoPlayer);
-  console.log(
-    "YouTube Subtitles Generator: Video container found.",
-    videoContainer
-  );
-
-  createSubtitleElements(); // Create subtitle elements
-  loadStoredSubtitles(); // Load stored subtitles for the current video
-
-  // Listen for messages from popup or background
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === "generateSubtitles") {
-      console.log("Content Script: Received generateSubtitles request");
-      const videoUrl = window.location.href;
-
-      console.log("Content Script: Sending URL to background:", videoUrl);
-
-      clearSubtitles(); // Clear previous subtitles
-
-      // Request subtitles from background script
-      chrome.runtime.sendMessage(
-        {
-          action: "fetchSubtitles",
-          videoUrl: videoUrl,
-          apiKey: message.apiKey,
-        },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            console.error(
-              "Error sending message to background:",
-              chrome.runtime.lastError
-            );
-            sendResponse({
-              status: "error",
-              message: "Could not communicate with background script.",
-            });
-          } else {
-            console.log(
-              "Content Script: Message sent to background, response:",
-              response
-            );
-          }
-        }
-      );
-
-      sendResponse({ status: "started" });
-      return true; // Indicate async response possible
-    } else if (message.action === "subtitlesGenerated") {
-      console.log("Content Script: Received subtitlesGenerated request");
-      currentSubtitles = message.subtitles || []; // Ensure it's an array
-      console.log(`Received ${currentSubtitles.length} subtitle entries.`);
-
-      if (currentSubtitles.length > 0) {
-        startSubtitleDisplay(); // Start displaying subtitles
-
-        // Store the subtitles locally for future use
-        const cleanedUrl = cleanYouTubeUrl(window.location.href);
-        chrome.storage.local.set({ [cleanedUrl]: currentSubtitles }, () => {
-          console.log("Content Script: Subtitles saved to local storage.");
-        });
-
-        sendResponse({ status: "success" }); // Confirm success to background
-      } else {
-        console.warn("Received empty subtitles array.");
-        clearSubtitles(); // Ensure display is cleared if no subs found
-        sendResponse({ status: "no_subtitles_found" });
-      }
-      return true; // Indicate response sent
+      console.log("No stored subtitles found for this video.");
     }
   });
-
-  console.log(
-    "YouTube Subtitles Generator: Initialization complete. Listening for messages."
-  );
 }
 
-// Creates subtitle elements and appends them to the video container
+function cleanYouTubeUrl(originalUrl) {
+  try {
+    const url = new URL(originalUrl);
+    const videoId = url.searchParams.get("v");
+    if (videoId) return `${url.origin}${url.pathname}?v=${videoId}`;
+  } catch (e) {
+    console.error("Error parsing URL:", e);
+  }
+  return originalUrl;
+}
+
 function createSubtitleElements() {
   if (document.getElementById("youtube-gemini-subtitles-container")) return;
 
@@ -179,9 +209,20 @@ function createSubtitleElements() {
   subtitleContainer.style.zIndex = "9999";
   subtitleContainer.style.pointerEvents = "none";
   subtitleContainer.style.display = "none";
+  subtitleContainer.style.width = "100%";
+  subtitleContainer.style.bottom = "10%";
+  subtitleContainer.style.textAlign = "center";
 
   subtitleText = document.createElement("div");
   subtitleText.id = "youtube-gemini-subtitles-text";
+  subtitleText.style.fontSize = "22px";
+  subtitleText.style.color = "white";
+  subtitleText.style.textShadow = "2px 2px 6px black";
+  subtitleText.style.padding = "6px 12px";
+  subtitleText.style.display = "inline-block";
+  subtitleText.style.backgroundColor = "rgba(0,0,0,0.4)";
+  subtitleText.style.borderRadius = "8px";
+
   subtitleContainer.appendChild(subtitleText);
 
   if (videoContainer) {
@@ -189,35 +230,28 @@ function createSubtitleElements() {
       videoContainer.style.position = "relative";
     }
     videoContainer.appendChild(subtitleContainer);
-    console.log("Subtitle container added to video container.");
-  } else {
-    console.error("Cannot add subtitle container, video container not found.");
+    console.log("Subtitle container added.");
   }
 }
 
-// Starts displaying subtitles
 function startSubtitleDisplay() {
   if (!videoPlayer || !subtitleContainer) {
-    console.warn("Cannot start subtitle display: Player or container missing.");
+    console.warn("Cannot start subtitle display: missing elements.");
     return;
   }
 
-  stopSubtitleDisplay(); // Clear any existing interval
+  stopSubtitleDisplay();
 
-  console.log("Starting subtitle display interval.");
-  checkInterval = setInterval(updateSubtitles, 100); // 100ms interval
-
+  checkInterval = setInterval(updateSubtitles, 100);
   videoPlayer.addEventListener("play", updateSubtitles);
   videoPlayer.addEventListener("seeked", updateSubtitles);
   videoPlayer.addEventListener("pause", hideCurrentSubtitle);
 }
 
-// Stops displaying subtitles
 function stopSubtitleDisplay() {
   if (checkInterval) {
     clearInterval(checkInterval);
     checkInterval = null;
-    console.log("Stopped subtitle display interval.");
   }
   if (videoPlayer) {
     videoPlayer.removeEventListener("play", updateSubtitles);
@@ -226,50 +260,18 @@ function stopSubtitleDisplay() {
   }
 }
 
-// Clears subtitles and stops display
-function clearSubtitles() {
-  currentSubtitles = [];
-  stopSubtitleDisplay();
-  hideCurrentSubtitle();
-  console.log("Subtitles cleared.");
-}
-
-// Hides the current subtitle
-function hideCurrentSubtitle() {
-  if (subtitleContainer) {
-    subtitleContainer.style.display = "none";
-  }
-  if (subtitleText) {
-    subtitleText.textContent = "";
-  }
-}
-
-// Updates subtitles based on the current video time
 function updateSubtitles() {
-  if (
-    !videoPlayer ||
-    !subtitleText ||
-    !subtitleContainer ||
-    videoPlayer.paused
-  ) {
+  if (!videoPlayer || !subtitleText || !subtitleContainer || videoPlayer.paused)
     return;
-  }
 
-  if (isNaN(videoPlayer.currentTime)) return;
+  const currentTime = videoPlayer.currentTime * 1000;
+  const subtitle = currentSubtitles.find(
+    (s) => currentTime >= s.startTime && currentTime <= s.endTime
+  );
 
-  const currentTime = videoPlayer.currentTime * 1000; // Convert to ms
-  let foundSubtitle = null;
-
-  for (const subtitle of currentSubtitles) {
-    if (currentTime >= subtitle.startTime && currentTime <= subtitle.endTime) {
-      foundSubtitle = subtitle;
-      break;
-    }
-  }
-
-  if (foundSubtitle) {
-    if (subtitleText.textContent !== foundSubtitle.text) {
-      subtitleText.textContent = foundSubtitle.text;
+  if (subtitle) {
+    if (subtitleText.textContent !== subtitle.text) {
+      subtitleText.textContent = subtitle.text;
     }
     subtitleContainer.style.display = "block";
   } else {
@@ -277,13 +279,259 @@ function updateSubtitles() {
   }
 }
 
-// --- Start Initialization ---
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    initialize();
-    monitorUrlChanges();
+function hideCurrentSubtitle() {
+  if (subtitleContainer) subtitleContainer.style.display = "none";
+  if (subtitleText) subtitleText.textContent = "";
+}
+
+function clearSubtitles() {
+  currentSubtitles = [];
+  stopSubtitleDisplay();
+  hideCurrentSubtitle();
+  console.log("Subtitles cleared.");
+}
+
+function updateSubtitleText(container, text) {
+  if (!container) return;
+  container.style.display = "block";
+  const textEl = container.querySelector("#youtube-gemini-subtitles-text");
+  if (textEl) textEl.textContent = text;
+}
+
+function requestSubtitles(container) {
+  if (!currentSubtitles.length) return;
+  updateSubtitles();
+}
+
+function handleVideoPause() {
+  if (!videoPlayer) return;
+  const currentTimestamp = videoPlayer.currentTime * 1000;
+
+  const subtitle = currentSubtitles.find(
+    (s) => currentTimestamp >= s.startTime && currentTimestamp <= s.endTime
+  );
+
+  if (!subtitle) {
+    console.log("Paused: no subtitle found at this timestamp.");
+    return;
+  }
+
+  console.log(`Paused at ${currentTimestamp}ms, translating:`, subtitle.text);
+
+  chrome.runtime.sendMessage(
+    {
+      type: "GET_TRANSLATION_FOR_TIMESTAMP",
+      videoId: currentVideoId,
+      timestamp: currentTimestamp,
+      text: subtitle.text,
+    },
+    (response) => {
+      if (chrome.runtime.lastError) {
+        console.error("Translation request failed:", chrome.runtime.lastError.message);
+        updateSubtitleText(subtitleContainer, "翻译连接失败");
+        return;
+      }
+
+      if (response && response.success) {
+        const text =
+          typeof response.translation === "string"
+            ? response.translation
+            : response.translation?.translated || "翻译解析失败";
+        updateSubtitleText(subtitleContainer, text);
+        console.log("翻译完成:", text);
+      } else {
+        console.error("Translation failed:", response?.error || "未知错误");
+        updateSubtitleText(subtitleContainer, "翻译失败");
+      }
+    }
+  );
+}
+
+function handleVideoPlay() {
+  console.log("Video resumed — restoring original subtitles.");
+  requestSubtitles(subtitleContainer);
+}
+
+function handleGenerateSubtitles(message, sendResponse) {
+  console.log("Received generateSubtitles request.");
+  clearSubtitles();
+
+  const videoUrl = window.location.href;
+  chrome.runtime.sendMessage(
+    {
+      action: "fetchSubtitles",
+      videoUrl,
+      apiKey: message.apiKey,
+    },
+    (response) => {
+      if (chrome.runtime.lastError) {
+        console.error("Error sending message to background:", chrome.runtime.lastError);
+        sendResponse({ status: "error", message: "Background communication failed." });
+      } else {
+        console.log("fetchSubtitles response:", response);
+      }
+    }
+  );
+
+  sendResponse({ status: "started" });
+}
+
+function handleSubtitlesGenerated(message, sendResponse) {
+  console.log("Received subtitlesGenerated message.");
+  currentSubtitles = message.subtitles || [];
+
+  if (currentSubtitles.length > 0) {
+    startSubtitleDisplay();
+
+    const cleanedUrl = cleanYouTubeUrl(window.location.href);
+    chrome.storage.local.set({ [cleanedUrl]: currentSubtitles }, () => {
+      console.log("Subtitles cached locally.");
+    });
+
+    sendResponse({ status: "success" });
+  } else {
+    clearSubtitles();
+    sendResponse({ status: "no_subtitles_found" });
+  }
+}
+
+// Assistant function implementations
+function handleGoToPreviousSentence() {
+  console.log("回到上一句 - Going to previous sentence");
+  if (!videoPlayer || !currentSubtitles.length) {
+    console.log("No video player or subtitles available");
+    return;
+  }
+
+  const currentTime = videoPlayer.currentTime * 1000;
+  let previousSubtitle = null;
+  
+  // Find the previous subtitle
+  for (let i = currentSubtitles.length - 1; i >= 0; i--) {
+    if (currentSubtitles[i].endTime < currentTime) {
+      previousSubtitle = currentSubtitles[i];
+      break;
+    }
+  }
+  
+  if (previousSubtitle) {
+    // Jump to the start of the previous subtitle
+    videoPlayer.currentTime = previousSubtitle.startTime / 1000;
+    console.log("Jumped to previous sentence:", previousSubtitle.text);
+  } else {
+    console.log("No previous sentence found");
+  }
+}
+
+function handleShowVocabulary() {
+  console.log("显示生词 - Showing vocabulary");
+  if (!videoPlayer || !currentSubtitles.length) {
+    console.log("No video player or subtitles available");
+    return;
+  }
+
+  const currentTime = videoPlayer.currentTime * 1000;
+  const currentSubtitle = currentSubtitles.find(
+    (s) => currentTime >= s.startTime && currentTime <= s.endTime
+  );
+
+  if (currentSubtitle) {
+    // Create a vocabulary popup
+    const vocabPopup = document.createElement("div");
+    vocabPopup.id = "vocabulary-popup";
+    vocabPopup.style.position = "fixed";
+    vocabPopup.style.top = "50%";
+    vocabPopup.style.left = "50%";
+    vocabPopup.style.transform = "translate(-50%, -50%)";
+    vocabPopup.style.background = "rgba(0,0,0,0.9)";
+    vocabPopup.style.color = "white";
+    vocabPopup.style.padding = "20px";
+    vocabPopup.style.borderRadius = "10px";
+    vocabPopup.style.zIndex = "100000";
+    vocabPopup.style.maxWidth = "400px";
+    vocabPopup.style.textAlign = "center";
+    vocabPopup.innerHTML = `
+      <h3 style="margin: 0 0 15px 0;">当前句子词汇分析</h3>
+      <p style="margin: 0 0 10px 0; font-size: 16px;">"${currentSubtitle.text}"</p>
+      <p style="margin: 0 0 15px 0; color: #ccc;">点击任意位置关闭</p>
+    `;
+    
+    document.body.appendChild(vocabPopup);
+    
+    // Close popup when clicked
+    vocabPopup.addEventListener("click", () => {
+      document.body.removeChild(vocabPopup);
+    });
+    
+    // Auto close after 5 seconds
+    setTimeout(() => {
+      if (document.body.contains(vocabPopup)) {
+        document.body.removeChild(vocabPopup);
+      }
+    }, 5000);
+  } else {
+    console.log("No current subtitle found");
+  }
+}
+
+function handleSelectPlaybackSpeed() {
+  console.log("选择倍速 - Selecting playback speed");
+  if (!videoPlayer) {
+    console.log("No video player available");
+    return;
+  }
+
+  // Create a speed selection popup
+  const speedPopup = document.createElement("div");
+  speedPopup.id = "speed-popup";
+  speedPopup.style.position = "fixed";
+  speedPopup.style.top = "50%";
+  speedPopup.style.left = "50%";
+  speedPopup.style.transform = "translate(-50%, -50%)";
+  speedPopup.style.background = "rgba(0,0,0,0.9)";
+  speedPopup.style.color = "white";
+  speedPopup.style.padding = "20px";
+  speedPopup.style.borderRadius = "10px";
+  speedPopup.style.zIndex = "100000";
+  speedPopup.style.textAlign = "center";
+  
+  const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+  const currentSpeed = videoPlayer.playbackRate;
+  
+  speedPopup.innerHTML = `
+    <h3 style="margin: 0 0 15px 0;">选择播放速度</h3>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+      ${speeds.map(speed => `
+        <button style="
+          background: ${speed === currentSpeed ? '#0078ff' : '#333'};
+          color: white;
+          border: none;
+          padding: 10px;
+          border-radius: 5px;
+          cursor: pointer;
+        " data-speed="${speed}">${speed}x</button>
+      `).join('')}
+    </div>
+    <p style="margin: 15px 0 0 0; color: #ccc; font-size: 12px;">点击任意位置关闭</p>
+  `;
+  
+  document.body.appendChild(speedPopup);
+  
+  // Add click handlers for speed buttons
+  speedPopup.querySelectorAll('button[data-speed]').forEach(button => {
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const speed = parseFloat(button.dataset.speed);
+      videoPlayer.playbackRate = speed;
+      console.log(`Changed playback speed to ${speed}x`);
+      document.body.removeChild(speedPopup);
+    });
   });
-} else {
-  initialize();
-  monitorUrlChanges();
+  
+  // Close popup when clicked outside buttons
+  speedPopup.addEventListener("click", (e) => {
+    if (e.target === speedPopup) {
+      document.body.removeChild(speedPopup);
+    }
+  });
 }

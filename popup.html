@@ -103,27 +103,28 @@
   <body>
     <!-- Main container for the popup -->
     <div class="container">
-      <!-- Header -->
-      <h2>YouTube Subtitles Generator</h2>
 
-      <!-- Input for Gemini API Key -->
-      <div>
-        <label for="apiKey">Gemini API Key</label>
-        <input
-          type="password"
-          id="apiKey"
-          placeholder="Enter your Gemini API Key"
-        />
-      </div>
+      <!-- Settings Section -->
+        <h3 style="font-size: 14px; margin: 0 0 10px 0; color: var(--muted);">设置</h3>
+        
+        <!-- Input for Gemini API Key -->
+        <div>
+          <label for="apiKey">Gemini API Key</label>
+          <input
+            type="password"
+            id="apiKey"
+            placeholder="Enter your Gemini API Key"
+          />
+        </div>
 
-      <!-- Generate Subtitles Button -->
-      <button id="generateBtn">Generate Caption Closed</button>
+        <!-- Generate Subtitles Button -->
+        <button id="generateBtn" style="margin-top: 10px;">Generate Caption Closed</button>
 
-      <!-- Message for existing subtitles -->
-      <div class="existing-subtitles" id="existingSubtitles"></div>
+        <!-- Message for existing subtitles -->
+        <div class="existing-subtitles" id="existingSubtitles"></div>
 
-      <!-- Status message -->
-      <div class="status" id="status"></div>
+        <!-- Status message -->
+        <div class="status" id="status"></div>
     </div>
 
     <!-- Link to the popup.js script -->

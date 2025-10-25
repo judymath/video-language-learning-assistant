@@ -3,6 +3,11 @@ document.addEventListener("DOMContentLoaded", function () {
   const apiKeyInput = document.getElementById("apiKey");
   const generateBtn = document.getElementById("generateBtn");
   const statusDiv = document.getElementById("status");
+  
+  // Assistant button elements
+  const btnPrev = document.getElementById("btn-prev");
+  const btnVocab = document.getElementById("btn-vocab");
+  const btnSpeed = document.getElementById("btn-speed");
 
   // Create a div for displaying existing subtitles message
   const existingSubtitlesDiv = document.createElement("div");
@@ -94,6 +99,10 @@ document.addEventListener("DOMContentLoaded", function () {
         currentTab.url &&
         currentTab.url.includes("youtube.com/watch")
       ) {
+
+        // 首先触发 content.js 创建悬浮窗
+        chrome.tabs.sendMessage(currentTab.id, { action: "showFloatingWindow" });
+
         // Send a message to the content script to generate subtitles
         chrome.tabs.sendMessage(
           currentTab.id,
@@ -133,5 +142,42 @@ document.addEventListener("DOMContentLoaded", function () {
         generateBtn.disabled = false; // Re-enable button on completion or error
       }
     }
+  });
+
+  // Assistant button event listeners
+  btnPrev.addEventListener("click", function() {
+    console.log("回到上一句 clicked");
+    // Send message to content script to go to previous sentence
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      if (tabs[0] && tabs[0].url && tabs[0].url.includes("youtube.com/watch")) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: "goToPreviousSentence" });
+      } else {
+        statusDiv.textContent = "请在YouTube视频页面使用此功能";
+      }
+    });
+  });
+
+  btnVocab.addEventListener("click", function() {
+    console.log("显示生词 clicked");
+    // Send message to content script to show vocabulary
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      if (tabs[0] && tabs[0].url && tabs[0].url.includes("youtube.com/watch")) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: "showVocabulary" });
+      } else {
+        statusDiv.textContent = "请在YouTube视频页面使用此功能";
+      }
+    });
+  });
+
+  btnSpeed.addEventListener("click", function() {
+    console.log("选择倍速 clicked");
+    // Send message to content script to select playback speed
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      if (tabs[0] && tabs[0].url && tabs[0].url.includes("youtube.com/watch")) {
+        chrome.tabs.sendMessage(tabs[0].id, { action: "selectPlaybackSpeed" });
+      } else {
+        statusDiv.textContent = "请在YouTube视频页面使用此功能";
+      }
+    });
   });
 });
