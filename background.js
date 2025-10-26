@@ -72,6 +72,19 @@ function parseSrt(srtText) {
 
 // Listener for messages from content or popup scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      // Add new translation handler
+  if (message.action === "translateWithGemini") {
+    chrome.storage.local.get(["geminiApiKey"], async (result) => {
+      if (!result.geminiApiKey) {
+        sendResponse({ success: false, error: "API key not found" });
+        return;
+      }
+      const translation = await translateWithGemini(message.text, result.geminiApiKey);
+      sendResponse(translation);
+    });
+    return true; // Keep message channel open for async response
+  }
+
   if (message.action === "fetchSubtitles") {
     const { videoUrl, apiKey } = message;
     const tabId = sender.tab?.id;
@@ -263,4 +276,42 @@ async function fetchSubtitlesFromGemini(videoUrl, apiKey, tabId) {
   }
 
   return parsedSubtitles;
+}
+
+async function translateWithGemini(text, apiKey) {
+  const prompt = `Translate the following English text to Simplified Chinese. Only provide the translation, no explanations:
+    "${text}"`;
+  
+  try {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      translation: data.candidates[0].content.parts[0].text
+    };
+  } catch (error) {
+    console.error('Translation error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 }

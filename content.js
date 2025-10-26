@@ -318,12 +318,13 @@ function handleVideoPause() {
 
   console.log(`Paused at ${currentTimestamp}ms, translating:`, subtitle.text);
 
+  // Update to use Gemini API
   chrome.runtime.sendMessage(
     {
-      type: "GET_TRANSLATION_FOR_TIMESTAMP",
+      action: "translateWithGemini",
+      text: subtitle.text,
       videoId: currentVideoId,
       timestamp: currentTimestamp,
-      text: subtitle.text,
     },
     (response) => {
       if (chrome.runtime.lastError) {
@@ -333,12 +334,9 @@ function handleVideoPause() {
       }
 
       if (response && response.success) {
-        const text =
-          typeof response.translation === "string"
-            ? response.translation
-            : response.translation?.translated || "翻译解析失败";
-        updateSubtitleText(subtitleContainer, text);
-        console.log("翻译完成:", text);
+        const translatedText = response.translation?.trim() || "翻译解析失败";
+        updateSubtitleText(subtitleContainer, translatedText);
+        console.log("Translation completed:", translatedText);
       } else {
         console.error("Translation failed:", response?.error || "未知错误");
         updateSubtitleText(subtitleContainer, "翻译失败");
