@@ -432,55 +432,138 @@ function handleGoToPreviousSentence() {
 }
 
 function handleShowVocabulary() {
-  console.log("显示生词 - Showing vocabulary");
-  if (!videoPlayer || !currentSubtitles.length) {
-    console.log("No video player or subtitles available");
-    return;
+    console.log("显示生词 - Showing vocabulary");
+    if (!videoPlayer || !currentSubtitles.length) {
+      console.log("No video player or subtitles available");
+      return;
+    }
+  
+    const currentTime = videoPlayer.currentTime * 1000;
+    const currentSubtitle = currentSubtitles.find(
+      (s) => currentTime >= s.startTime && currentTime <= s.endTime
+    );
+  
+    if (currentSubtitle) {
+      // First verify API key exists
+      chrome.storage.local.get(['geminiApiKey'], function(result) {
+        if (!result.geminiApiKey) {
+          showMessage("请先设置API密钥");
+          return;
+        }
+  
+        // Create loading popup
+        const vocabPopup = document.createElement("div");
+        vocabPopup.id = "vocabulary-popup";
+        vocabPopup.style.position = "fixed";
+        vocabPopup.style.top = "50%";
+        vocabPopup.style.left = "50%";
+        vocabPopup.style.transform = "translate(-50%, -50%)";
+        vocabPopup.style.background = "rgba(0,0,0,0.9)";
+        vocabPopup.style.color = "white";
+        vocabPopup.style.padding = "20px";
+        vocabPopup.style.borderRadius = "10px";
+        vocabPopup.style.zIndex = "100000";
+        vocabPopup.style.maxWidth = "400px";
+        vocabPopup.style.textAlign = "center";
+        vocabPopup.innerHTML = `
+          <h3 style="margin: 0 0 15px 0;">词汇分析中...</h3>
+          <p style="margin: 0 0 10px 0; font-size: 16px;">"${currentSubtitle.text}"</p>
+          <p style="margin: 0 0 15px 0; color: #ccc;">请稍候</p>
+        `;
+        
+        document.body.appendChild(vocabPopup);
+  
+        // Request vocabulary extraction
+        chrome.runtime.sendMessage(
+          {
+            action: "extractVocabulary",
+            text: currentSubtitle.text
+          },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              vocabPopup.innerHTML = `
+                <h3 style="margin: 0 0 15px 0;">分析失败</h3>
+                <p style="margin: 0 0 10px 0; color: #ff6b6b;">请稍后重试</p>
+                <p style="margin: 0 0 15px 0; color: #ccc;">点击关闭</p>
+              `;
+              return;
+            }
+  
+            if (response?.success) {
+                // Extract words to highlight
+                const vocabWords = response.vocabulary
+                  .split('\n')
+                  .filter(line => line.trim())
+                  .map(line => line.split('-')[0].trim());
+              
+                // Highlight words in subtitle text
+                let highlightedText = currentSubtitle.text;
+                vocabWords.forEach(word => {
+                  const regex = new RegExp(`\\b${word}\\b`, 'gi');
+                  highlightedText = highlightedText.replace(regex, `<span style="
+                    background-color: rgba(76, 175, 80, 0.3);
+                    border-bottom: 1px solid #4CAF50;
+                    padding: 0 2px;
+                  ">${word}</span>`);
+                });
+              
+                // Format vocabulary pairs
+                const vocabLines = response.vocabulary
+                  .split('\n')
+                  .filter(line => line.trim())
+                  .map(line => {
+                    const [word, translation] = line.split('-').map(s => s.trim());
+                    return `
+                      <div class="vocab-pair" style="
+                        display: grid;
+                        grid-template-columns: 1fr auto 1fr;
+                        gap: 10px;
+                        padding: 5px 0;
+                        align-items: center;
+                      ">
+                        <span style="color: #fff;">${word}</span>
+                        <span style="color: #666;">-</span>
+                        <span style="color: #4CAF50;">${translation}</span>
+                      </div>
+                    `;
+                  })
+                  .join('');
+              
+                vocabPopup.innerHTML = `
+                  <p style="margin: 0 0 15px 0; font-size: 16px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px;">
+                    "${highlightedText}"
+                  </p>
+                  <div style="margin: 15px 0;">
+                    ${vocabLines}
+                  </div>
+                  <p style="margin: 10px 0 0 0; color: #999; font-size: 12px; text-align: center;">点击关闭</p>
+                `;
+            } else {
+              vocabPopup.innerHTML = `
+                <h3 style="margin: 0 0 15px 0;">分析失败</h3>
+                <p style="margin: 0 0 10px 0; color: #ff6b6b;">${response?.error || '未知错误'}</p>
+                <p style="margin: 0 0 15px 0; color: #ccc;">点击关闭</p>
+              `;
+            }
+          }
+        );
+        
+        // Close popup when clicked
+        vocabPopup.addEventListener("click", () => {
+          document.body.removeChild(vocabPopup);
+        });
+        
+        // Auto close after 15 seconds (increased from 5s for reading time)
+        setTimeout(() => {
+          if (document.body.contains(vocabPopup)) {
+            document.body.removeChild(vocabPopup);
+          }
+        }, 15000);
+      });
+    } else {
+      console.log("No current subtitle found");
+    }
   }
-
-  const currentTime = videoPlayer.currentTime * 1000;
-  const currentSubtitle = currentSubtitles.find(
-    (s) => currentTime >= s.startTime && currentTime <= s.endTime
-  );
-
-  if (currentSubtitle) {
-    // Create a vocabulary popup
-    const vocabPopup = document.createElement("div");
-    vocabPopup.id = "vocabulary-popup";
-    vocabPopup.style.position = "fixed";
-    vocabPopup.style.top = "50%";
-    vocabPopup.style.left = "50%";
-    vocabPopup.style.transform = "translate(-50%, -50%)";
-    vocabPopup.style.background = "rgba(0,0,0,0.9)";
-    vocabPopup.style.color = "white";
-    vocabPopup.style.padding = "20px";
-    vocabPopup.style.borderRadius = "10px";
-    vocabPopup.style.zIndex = "100000";
-    vocabPopup.style.maxWidth = "400px";
-    vocabPopup.style.textAlign = "center";
-    vocabPopup.innerHTML = `
-      <h3 style="margin: 0 0 15px 0;">当前句子词汇分析</h3>
-      <p style="margin: 0 0 10px 0; font-size: 16px;">"${currentSubtitle.text}"</p>
-      <p style="margin: 0 0 15px 0; color: #ccc;">点击任意位置关闭</p>
-    `;
-    
-    document.body.appendChild(vocabPopup);
-    
-    // Close popup when clicked
-    vocabPopup.addEventListener("click", () => {
-      document.body.removeChild(vocabPopup);
-    });
-    
-    // Auto close after 5 seconds
-    setTimeout(() => {
-      if (document.body.contains(vocabPopup)) {
-        document.body.removeChild(vocabPopup);
-      }
-    }, 5000);
-  } else {
-    console.log("No current subtitle found");
-  }
-}
 
 function handleSelectPlaybackSpeed() {
   console.log("选择倍速 - Selecting playback speed");

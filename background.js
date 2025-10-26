@@ -84,6 +84,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
     return true; // Keep message channel open for async response
   }
+    // Add new vocabulary extraction handler
+  if (message.action === "extractVocabulary") {
+    chrome.storage.local.get(["geminiApiKey"], async (result) => {
+      if (!result.geminiApiKey) {
+        sendResponse({ success: false, error: "API key not found" });
+        return;
+      }
+      const vocabResult = await extractVocabularyWithGemini(message.text, result.geminiApiKey);
+      sendResponse(vocabResult);
+    });
+    return true; // Keep message channel open for async response
+  }
 
   if (message.action === "fetchSubtitles") {
     const { videoUrl, apiKey } = message;
@@ -331,6 +343,63 @@ async function translateWithGemini(text, apiKey) {
       };
     } catch (error) {
       console.error('Translation error:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Add new function for vocabulary extraction
+async function extractVocabularyWithGemini(text, apiKey) {
+    try {
+      const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + apiKey;
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `Extract 3 key words or phrases from this English sentence and provide Chinese translations.
+          Format requirements:
+          - One word/phrase per line
+          - Use exactly this format: "word - 翻译"
+          - No extra explanations or numbering
+          - No blank lines between entries
+          
+          Input sentence: "${text}"`
+              }]
+            }],
+          generationConfig: {
+            temperature: 0.1,
+            topP: 0.8,
+            maxOutputTokens: 1024
+          }
+        })
+      });
+  
+      console.log("Vocab API Response Status:", response.status);
+  
+      if (response.status === 401) {
+        throw new Error("Invalid API key");
+      }
+  
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("API Error Details:", errorData);
+        throw new Error(`API request failed: ${response.status}`);
+      }
+  
+      const data = await response.json();
+      return {
+        success: true,
+        vocabulary: data.candidates[0].content.parts[0].text
+      };
+    } catch (error) {
+      console.error('Vocabulary extraction error:', error);
       return {
         success: false,
         error: error.message
