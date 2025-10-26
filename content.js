@@ -318,31 +318,41 @@ function handleVideoPause() {
 
   console.log(`Paused at ${currentTimestamp}ms, translating:`, subtitle.text);
 
-  // Update to use Gemini API
-  chrome.runtime.sendMessage(
-    {
-      action: "translateWithGemini",
-      text: subtitle.text,
-      videoId: currentVideoId,
-      timestamp: currentTimestamp,
-    },
-    (response) => {
-      if (chrome.runtime.lastError) {
-        console.error("Translation request failed:", chrome.runtime.lastError.message);
-        updateSubtitleText(subtitleContainer, "翻译连接失败");
-        return;
-      }
-
-      if (response && response.success) {
-        const translatedText = response.translation?.trim() || "翻译解析失败";
-        updateSubtitleText(subtitleContainer, translatedText);
-        console.log("Translation completed:", translatedText);
-      } else {
-        console.error("Translation failed:", response?.error || "未知错误");
-        updateSubtitleText(subtitleContainer, "翻译失败");
-      }
+  // First verify API key exists
+  chrome.storage.local.get(['geminiApiKey'], function(result) {
+    if (!result.geminiApiKey) {
+      updateSubtitleText(subtitleContainer, "请先设置API密钥");
+      return;
     }
-  );
+
+    // Send translation request with verified API key
+    chrome.runtime.sendMessage(
+      {
+        action: "translateWithGemini",
+        text: subtitle.text,
+        videoId: currentVideoId,
+        timestamp: currentTimestamp,
+        apiKey: result.geminiApiKey
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("Translation request failed:", chrome.runtime.lastError);
+          updateSubtitleText(subtitleContainer, "翻译连接失败");
+          return;
+        }
+
+        if (response && response.success) {
+          const translatedText = response.translation?.trim() || "翻译解析失败";
+          updateSubtitleText(subtitleContainer, translatedText);
+          console.log("Translation completed:", translatedText);
+        } else {
+          const errorMessage = response?.error === "401" ? "API密钥无效" : "翻译失败";
+          console.error("Translation failed:", response?.error);
+          updateSubtitleText(subtitleContainer, errorMessage);
+        }
+      }
+    );
+  });
 }
 
 function handleVideoPlay() {

@@ -279,39 +279,61 @@ async function fetchSubtitlesFromGemini(videoUrl, apiKey, tabId) {
 }
 
 async function translateWithGemini(text, apiKey) {
-  const prompt = `Translate the following English text to Simplified Chinese. Only provide the translation, no explanations:
-    "${text}"`;
+    try {
+      // Debug logging
+      console.log("Starting translation request...");
+      
+      // Validate API key
+      if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10) {
+        throw new Error("Invalid API key format");
+      }
   
-  try {
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: prompt
-          }]
-        }]
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+      const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + apiKey;
+      
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `请将以下英文翻译成中文，只需要给出翻译结果，不要解释或提供选项：\n\n "${text}"`
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            topP: 0.8
+          }
+        })
+      });
+  
+      console.log("API Response Status:", response.status);
+  
+      if (response.status === 401) {
+        throw new Error("Invalid API key");
+      }
+  
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("API Error Details:", errorData);
+        throw new Error(`API request failed: ${response.status}`);
+      }
+  
+      const data = await response.json();
+      if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        throw new Error("Invalid response format");
+      }
+  
+      return {
+        success: true,
+        translation: data.candidates[0].content.parts[0].text
+      };
+    } catch (error) {
+      console.error('Translation error:', error);
+      return {
+        success: false,
+        error: error.message
+      };
     }
-
-    const data = await response.json();
-    return {
-      success: true,
-      translation: data.candidates[0].content.parts[0].text
-    };
-  } catch (error) {
-    console.error('Translation error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
   }
-}
