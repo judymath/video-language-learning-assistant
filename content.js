@@ -8,6 +8,18 @@ let currentVideoId = null;
 let currentUrl = window.location.href;
 let initAttempts = 0;
 const MAX_INIT_ATTEMPTS = 10;
+// Add storage helper functions
+async function addToSavedWords(word, translation) {
+  const result = await chrome.storage.local.get(['savedWords']);
+  const savedWords = result.savedWords || {};
+  savedWords[word.toLowerCase()] = translation;
+  await chrome.storage.local.set({ savedWords });
+}
+
+async function getSavedWords() {
+  const result = await chrome.storage.local.get(['savedWords']);
+  return result.savedWords || {};
+}
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
@@ -479,7 +491,7 @@ function handleShowVocabulary() {
             action: "extractVocabulary",
             text: currentSubtitle.text
           },
-          (response) => {
+          async function(response) {
             if (chrome.runtime.lastError) {
               vocabPopup.innerHTML = `
                 <h3 style="margin: 0 0 15px 0;">分析失败</h3>
@@ -488,56 +500,108 @@ function handleShowVocabulary() {
               `;
               return;
             }
-  
+
+            // Add storage helper functions
+            async function addToSavedWords(word, translation) {
+              const result = await chrome.storage.local.get(['savedWords']);
+              const savedWords = result.savedWords || {};
+              savedWords[word.toLowerCase()] = translation;
+              await chrome.storage.local.set({ savedWords });
+            }
+
+            async function getSavedWords() {
+              const result = await chrome.storage.local.get(['savedWords']);
+              return result.savedWords || {};
+            }
+
+            // Update vocabulary display with add buttons and saved status
             if (response?.success) {
-                // Extract words to highlight
-                const vocabWords = response.vocabulary
-                  .split('\n')
-                  .filter(line => line.trim())
-                  .map(line => line.split('-')[0].trim());
-              
-                // Highlight words in subtitle text
-                let highlightedText = currentSubtitle.text;
-                vocabWords.forEach(word => {
-                  const regex = new RegExp(`\\b${word}\\b`, 'gi');
-                  highlightedText = highlightedText.replace(regex, `<span style="
-                    background-color: rgba(76, 175, 80, 0.3);
-                    border-bottom: 1px solid #4CAF50;
-                    padding: 0 2px;
-                  ">${word}</span>`);
+              // Get saved words first
+              const savedWords = await getSavedWords();
+
+              // Extract words and create highlighted text
+              const vocabWords = response.vocabulary
+                .split('\n')
+                .filter(line => line.trim())
+                .map(line => line.split('-')[0].trim());
+
+              // Highlight text with different colors for saved words
+              let highlightedText = currentSubtitle.text;
+              vocabWords.forEach(word => {
+                const regex = new RegExp(`\\b${word}\\b`, 'gi');
+                const isSaved = savedWords[word.toLowerCase()];
+                const highlightColor = isSaved ?
+                  'rgba(255, 235, 59, 0.3)' : // yellow for saved
+                  'rgba(76, 175, 80, 0.3)'; // green for new
+                const borderColor = isSaved ? '#FDD835' : '#4CAF50';
+
+                highlightedText = highlightedText.replace(regex, `<span style="
+                  background-color: ${highlightColor};
+                  border-bottom: 1px solid ${borderColor};
+                  padding: 0 2px;
+                ">${word}</span>`);
+              });
+
+              // Format vocabulary pairs with add buttons
+              const vocabLines = response.vocabulary
+                .split('\n')
+                .filter(line => line.trim())
+                .map(line => {
+                  const [word, translation] = line.split('-').map(s => s.trim());
+                  const isSaved = savedWords[word.toLowerCase()];
+
+                  return `
+                    <div class="vocab-pair" style="
+                      display: grid;
+                      grid-template-columns: 1fr auto 1fr auto;
+                      gap: 10px;
+                      padding: 5px 0;
+                      align-items: center;
+                    ">
+                      <span style="color: #fff;">${word}</span>
+                      <span style="color: #666;">-</span>
+                      <span style="color: #4CAF50;">${translation}</span>
+                      ${isSaved ?
+                      `<span style="color: #FDD835; font-size: 12px;">已保存</span>` :
+                      `<button 
+                          class="add-word-btn" 
+                          style="
+                            background: transparent;
+                            border: 1px solid #4CAF50;
+                            color: #4CAF50;
+                            padding: 2px 8px;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 12px;
+                          "
+                          data-word="${word}"
+                          data-translation="${translation}"
+                        >添加</button>`}
+                    </div>
+                  `;
+                })
+                .join('');
+
+              vocabPopup.innerHTML = `
+                <p style="margin: 0 0 15px 0; font-size: 16px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px;">
+                  "${highlightedText}"
+                </p>
+                <div style="margin: 15px 0;">
+                  ${vocabLines}
+                </div>
+                <p style="margin: 10px 0 0 0; color: #999; font-size: 12px; text-align: center;">关闭</p>
+              `;
+
+              // Add click handlers for add buttons
+              vocabPopup.querySelectorAll('.add-word-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                  e.stopPropagation(); // Prevent popup from closing
+                  const word = btn.dataset.word;
+                  const translation = btn.dataset.translation;
+                  await addToSavedWords(word, translation);
+                  btn.outerHTML = `<span style="color: #FDD835; font-size: 12px;">已保存</span>`;
                 });
-              
-                // Format vocabulary pairs
-                const vocabLines = response.vocabulary
-                  .split('\n')
-                  .filter(line => line.trim())
-                  .map(line => {
-                    const [word, translation] = line.split('-').map(s => s.trim());
-                    return `
-                      <div class="vocab-pair" style="
-                        display: grid;
-                        grid-template-columns: 1fr auto 1fr;
-                        gap: 10px;
-                        padding: 5px 0;
-                        align-items: center;
-                      ">
-                        <span style="color: #fff;">${word}</span>
-                        <span style="color: #666;">-</span>
-                        <span style="color: #4CAF50;">${translation}</span>
-                      </div>
-                    `;
-                  })
-                  .join('');
-              
-                vocabPopup.innerHTML = `
-                  <p style="margin: 0 0 15px 0; font-size: 16px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px;">
-                    "${highlightedText}"
-                  </p>
-                  <div style="margin: 15px 0;">
-                    ${vocabLines}
-                  </div>
-                  <p style="margin: 10px 0 0 0; color: #999; font-size: 12px; text-align: center;">点击关闭</p>
-                `;
+              });
             } else {
               vocabPopup.innerHTML = `
                 <h3 style="margin: 0 0 15px 0;">分析失败</h3>
