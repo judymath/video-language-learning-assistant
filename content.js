@@ -21,6 +21,38 @@ async function getSavedWords() {
   return result.savedWords || {};
 }
 
+// Helper function to show messages
+function showMessage(message) {
+  // Remove existing message if any
+  const existingMessage = document.getElementById('extension-message');
+  if (existingMessage) {
+    existingMessage.remove();
+  }
+  
+  const messageDiv = document.createElement("div");
+  messageDiv.id = "extension-message";
+  messageDiv.style.position = "fixed";
+  messageDiv.style.top = "20px";
+  messageDiv.style.left = "50%";
+  messageDiv.style.transform = "translateX(-50%)";
+  messageDiv.style.background = "rgba(0,0,0,0.8)";
+  messageDiv.style.color = "white";
+  messageDiv.style.padding = "10px 20px";
+  messageDiv.style.borderRadius = "5px";
+  messageDiv.style.zIndex = "100001";
+  messageDiv.style.fontSize = "14px";
+  messageDiv.textContent = message;
+  
+  document.body.appendChild(messageDiv);
+  
+  // Auto remove after 3 seconds
+  setTimeout(() => {
+    if (document.body.contains(messageDiv)) {
+      document.body.removeChild(messageDiv);
+    }
+  }, 3000);
+}
+
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
     initialize();
@@ -155,7 +187,7 @@ function createFloatingPanel() {
 
   panel.querySelector("#btn-speed").addEventListener("click", () => {
       console.log("3")
-      handleSelectPlaybackSpeed
+      handleSelectPlaybackSpeed();
   });
 } 
 
@@ -630,9 +662,19 @@ function handleShowVocabulary() {
   }
 
 function handleSelectPlaybackSpeed() {
-  console.log("选择倍速 - Selecting playback speed");
-  if (!videoPlayer) {
-    console.log("No video player available");
+  console.log("选择倍速 - Selecting playback speed for current sentence");
+  if (!videoPlayer || !currentSubtitles.length) {
+    console.log("No video player or subtitles available");
+    return;
+  }
+
+  const currentTime = videoPlayer.currentTime * 1000;
+  const currentSubtitle = currentSubtitles.find(
+    (s) => currentTime >= s.startTime && currentTime <= s.endTime
+  );
+
+  if (!currentSubtitle) {
+    showMessage("请先暂停在某个句子上");
     return;
   }
 
@@ -649,44 +691,116 @@ function handleSelectPlaybackSpeed() {
   speedPopup.style.borderRadius = "10px";
   speedPopup.style.zIndex = "100000";
   speedPopup.style.textAlign = "center";
+  speedPopup.style.maxWidth = "400px";
   
   const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-  const currentSpeed = videoPlayer.playbackRate;
   
   speedPopup.innerHTML = `
-    <h3 style="margin: 0 0 15px 0;">选择播放速度</h3>
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+    <p style="margin: 0 0 15px 0; font-size: 14px; color: #ccc;">
+      "${currentSubtitle.text}"
+    </p>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
       ${speeds.map(speed => `
         <button style="
-          background: ${speed === currentSpeed ? '#0078ff' : '#333'};
+          background: #333;
           color: white;
           border: none;
           padding: 10px;
           border-radius: 5px;
           cursor: pointer;
-        " data-speed="${speed}">${speed}x</button>
+          transition: background-color 0.2s;
+        " data-speed="${speed}" onmouseover="this.style.background='#555'" onmouseout="this.style.background='#333'">${speed}x</button>
       `).join('')}
     </div>
-    <p style="margin: 15px 0 0 0; color: #ccc; font-size: 12px;">点击任意位置关闭</p>
+    <button id="stop-loop-btn" style="
+      background: #ff4444;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-right: 10px;
+    ">Break</button>
   `;
   
   document.body.appendChild(speedPopup);
+  
+  let loopInterval = null;
+  let isLooping = false;
   
   // Add click handlers for speed buttons
   speedPopup.querySelectorAll('button[data-speed]').forEach(button => {
     button.addEventListener('click', (e) => {
       e.stopPropagation();
       const speed = parseFloat(button.dataset.speed);
-      videoPlayer.playbackRate = speed;
-      console.log(`Changed playback speed to ${speed}x`);
-      document.body.removeChild(speedPopup);
+      
+      // Stop any existing loop
+      if (loopInterval) {
+        clearInterval(loopInterval);
+      }
+      
+      // Start new loop
+      startSentenceLoop(currentSubtitle, speed);
+      isLooping = true;
+      
+      // Update UI to show current speed
+      speedPopup.querySelectorAll('button[data-speed]').forEach(btn => {
+        btn.style.background = btn === button ? '#0078ff' : '#333';
+      });
+      
+      console.log(`Started looping sentence at ${speed}x speed`);
     });
+  });
+  
+  // Stop loop button
+  const stopBtn = speedPopup.querySelector('#stop-loop-btn');
+  stopBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (loopInterval) {
+      clearInterval(loopInterval);
+      loopInterval = null;
+      isLooping = false;
+      videoPlayer.playbackRate = 1.0; // Reset to normal speed
+      console.log("Stopped sentence loop");
+    }
+    // Close the popup when break is clicked
+    document.body.removeChild(speedPopup);
   });
   
   // Close popup when clicked outside buttons
   speedPopup.addEventListener("click", (e) => {
     if (e.target === speedPopup) {
+      if (loopInterval) {
+        clearInterval(loopInterval);
+      }
       document.body.removeChild(speedPopup);
     }
   });
+  
+  // Function to start sentence loop
+  function startSentenceLoop(subtitle, speed) {
+    if (loopInterval) {
+      clearInterval(loopInterval);
+    }
+    
+    // Set playback speed
+    videoPlayer.playbackRate = speed;
+    
+    // Calculate loop duration
+    const loopDuration = (subtitle.endTime - subtitle.startTime) / 1000; // in seconds
+    const loopIntervalMs = loopDuration * 1000; // in milliseconds
+    
+    // Start the loop
+    videoPlayer.currentTime = subtitle.startTime / 1000;
+    videoPlayer.play();
+    
+    loopInterval = setInterval(() => {
+      if (videoPlayer.currentTime * 1000 >= subtitle.endTime) {
+        // Reset to start of sentence
+        videoPlayer.currentTime = subtitle.startTime / 1000;
+      }
+    }, 100); // Check every 100ms
+    
+    console.log(`Looping sentence: "${subtitle.text}" at ${speed}x speed`);
+  }
 }
