@@ -97,24 +97,29 @@
     </style>
   </head>
   <body>
-    <!-- 页面 1：Profile 设置 -->
+    <!-- Profile 设置 -->
     <div id="profilePage">
-      <h3>学习设置</h3>
+      <h3>Profile Setting</h3>
 
       <fieldset>
-        <legend>目标学习语言</legend>
-        <label><input type="radio" name="tarlang" value="english" /> 英语</label>
-        <label><input type="radio" name="tarlang" value="french" /> 法语</label>
-        <label><input type="radio" name="tarlang" value="japanese" /> 日语</label>
+        <legend>Select target language</legend>
+        <label><input type="radio" name="tarlang" value="french" />French</label>
+        <label><input type="radio" name="tarlang" value="spanish" />Spanish</label>
+        <label><input type="radio" name="tarlang" value="portuguese" />Portuguese</label>
+        <label><input type="radio" name="tarlang" value="german" />German</label>
       </fieldset>
 
       <fieldset>
-        <legend>当前水平</legend>
-        <label><input type="radio" name="level" value="A1" /> A1</label>
-        <label><input type="radio" name="level" value="A2" /> A2</label>
-        <label><input type="radio" name="level" value="B1" /> B1</label>
+        <legend>CEFR level</legend>
+        <label><input type="radio" name="level" value="A1" />A1</label>
+        <label><input type="radio" name="level" value="A2" />A2</label>
+        <label><input type="radio" name="level" value="B1" />B1</label>
+        <label><input type="radio" name="level" value="B2" />B2</label>
+        <label><input type="radio" name="level" value="C1" />C1</label>
+        <label><input type="radio" name="level" value="C2" />C2</label>
       </fieldset>
 
+      <!-- api设置 -->
       <div>
         <label for="apiKey">Gemini API Key</label>
         <input
@@ -125,14 +130,14 @@
       </div>
 
       <button id="saveProfileBtn" style="margin-top: 10px">
-        保存并继续
+        save
       </button>
     </div>
 
-    <!-- 页面 2：字幕生成 -->
+    <!-- 字幕生成 -->
     <div id="subtitlePage" class="hidden">
-      <h3>YouTube 字幕生成</h3>
-      <button id="generateBtn">Generate Caption Closed</button>
+      <h3>YouTube subtitles generation</h3>
+      <button id="generateBtn">Generate</button>
       <div id="existingSubtitles" style="color: green; margin-top: 8px;"></div>
       <div class="status" id="status"></div>
     </div>

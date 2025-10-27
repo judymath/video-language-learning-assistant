@@ -7,7 +7,10 @@ let checkInterval = null;
 let currentVideoId = null;
 let currentUrl = window.location.href;
 let initAttempts = 0;
+let vocabPopup = null;
+let loopInterval = null;
 const MAX_INIT_ATTEMPTS = 10;
+
 // Add storage helper functions
 async function addToSavedWords(word, translation) {
   const result = await chrome.storage.local.get(['savedWords']);
@@ -107,14 +110,17 @@ function initialize() {
       } else if (message.action === "subtitlesGenerated") {
         handleSubtitlesGenerated(message, sendResponse);
         return true;
+      } else if (message.action === "selectPlaybackSpeed") {
+        handleSelectPlaybackSpeed();
+        return true;
       } else if (message.action === "goToPreviousSentence") {
         handleGoToPreviousSentence();
         return true;
-      } else if (message.action === "showVocabulary") {
-        handleShowVocabulary();
+      } else if (message.action === "translateSentence") {
+        handleTranslation();
         return true;
-      } else if (message.action === "selectPlaybackSpeed") {
-        handleSelectPlaybackSpeed();
+      } else if (message.action === "showWordNotebook") {
+        handleShowWordNotebook();
         return true;
       }
     });
@@ -123,7 +129,6 @@ function initialize() {
 }
 
 function createFloatingPanel() {
-  // 如果悬浮窗已存在，显示它而不是创建新的
   const existingPanel = document.getElementById("extension-floating-panel");
   if (existingPanel) {
     existingPanel.style.display = "block";
@@ -135,7 +140,7 @@ function createFloatingPanel() {
   panel.style.position = "fixed";
   panel.style.top = "80px";
   panel.style.right = "40px";
-  panel.style.width = "200px";
+  panel.style.width = "300px";
   panel.style.background = "rgba(30,30,30,0.85)";
   panel.style.border = "1px solid rgba(255,255,255,0.2)";
   panel.style.borderRadius = "10px";
@@ -149,27 +154,116 @@ function createFloatingPanel() {
   panel.style.cursor = "move";
   panel.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <div style="font-weight:bold;">语言学习助手</div>
+        <div style="font-weight:bold;">Language Learning Assistant</div>
         <button id="close-panel" style="
             background:transparent; color:#fff; border:none; 
             cursor:pointer; font-size:16px; padding:0; width:20px; height:20px;
             display:flex; align-items:center; justify-content:center;">×</button>
       </div>
-      <button id="btn-prev" style="
-          background:#0078ff; color:#fff; border:none; border-radius:6px;
-          padding:6px 10px; width:100%; cursor:pointer;">回到上一句</button>
-      <button id="btn-vocab" style="
-          margin-top:6px; background:#00c896; color:#fff; border:none; border-radius:6px;
-          padding:6px 10px; width:100%; cursor:pointer;">显示生词</button>
-      <button id="btn-speed" style="
-          margin-top:6px; background:#ffaa00; color:#fff; border:none; border-radius:6px;
-          padding:6px 10px; width:100%; cursor:pointer;">选择倍速</button>
+
+      <div style="display:flex; gap:6px; margin-top:6px;">
+        <button id="btn-speed" style="
+          flex:1; background:#ff5e5e; color:#fff; border:none;
+          border-radius:6px; padding:6px 0; font-weight:600; cursor:pointer;
+          font-size:13px;">Single Sentence Loop</button>
+        <select id="speed-select" style="
+          width:80px; border-radius:6px; border:none; padding:4px; background:#444; color:#fff;">
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1x</option>
+          <option value="1.5">1.5x</option>
+          <option value="1.75">1.75x</option>
+          <option value="2">2x</option>
+        </select>
+      </div>
+
+      <div style="
+        display:flex; justify-content:space-between; gap:6px; margin-top:8px;">
+        
+        <button id="btn-prev" style="
+          flex:1; background:#0078ff; color:#fff; border:none; border-radius:6px; padding:6px 0;
+          font-size:13px; cursor:pointer;">
+          Previous
+        </button>
+
+        <button id="btn-notebook" style="
+          flex:1; background:#ffaa00; color:#fff; border:none; border-radius:6px; padding:6px 0;
+          font-size:13px; cursor:pointer;">
+          Notebook
+        </button>
+        
+        <button id="btn-trans" style="
+          flex:1; background:#00c896; color:#fff; border:none; border-radius:6px; padding:6px 0;
+          font-size:13px; cursor:pointer;">
+          Translation
+        </button>
+      </div>
+
+      <div id="notebook-container" style="
+        margin-top:10px;
+        max-height: 180px;
+        overflow-y: auto;
+        background: rgba(255,255,255,0.05);
+        border-radius: 8px;
+        padding: 8px;
+        display: none; /* 默认隐藏 */
+      "></div>
   `;
 
+  const videoStatus = document.createElement("div");
+  videoStatus.id = "videoStatus";
+  videoStatus.style.marginTop = "10px";
+  videoStatus.style.fontSize = "15px";
+  videoStatus.style.fontWeight = "600";
+  videoStatus.style.textAlign = "center";
+  videoStatus.style.color = "#00e676"; // 初始绿色
+  videoStatus.style.textShadow = "0 0 4px rgba(0,0,0,0.6)";
+  videoStatus.textContent = "Playing";
+  panel.appendChild(videoStatus);
 
   document.body.appendChild(panel);
+  dragFloatingWindow(panel);
 
-  // 拖拽逻辑
+  const videoPlayer = document.querySelector("video");
+  if (videoPlayer) {
+    const statusEl = videoStatus;
+
+    videoPlayer.addEventListener("play", () => {
+      statusEl.textContent = "Playing";
+      statusEl.style.color = "#00e676";
+    });
+
+    videoPlayer.addEventListener("pause", () => {
+      statusEl.textContent = "Paused";
+      statusEl.style.color = "#ff5252";
+    });
+  }
+
+  // 关闭按钮事件绑定
+  panel.querySelector("#close-panel").addEventListener("click", (e) => {
+      e.stopPropagation(); // 防止触发拖拽
+      document.body.removeChild(panel);
+  });
+
+  // 按钮事件绑定
+  panel.querySelector("#btn-speed").addEventListener("click", () => {
+      handleSelectPlaybackSpeed();
+  });
+
+  panel.querySelector("#btn-prev").addEventListener("click", () => {
+      handleGoToPreviousSentence();
+  });
+
+  panel.querySelector("#btn-trans").addEventListener("click", () => {
+      handleTranslation();
+  });
+
+  panel.querySelector("#btn-notebook").addEventListener("click", () => {
+      handleShowWordNotebook();
+  });
+} 
+
+function dragFloatingWindow(panel){
   let isDragging = false, offsetX, offsetY;
   panel.addEventListener("mousedown", (e) => {
       isDragging = true;
@@ -184,29 +278,7 @@ function createFloatingPanel() {
       }
   });
   document.addEventListener("mouseup", () => (isDragging = false));
-
-  // 关闭按钮事件绑定
-  panel.querySelector("#close-panel").addEventListener("click", (e) => {
-      e.stopPropagation(); // 防止触发拖拽
-      document.body.removeChild(panel);
-  });
-
-  // 按钮事件绑定
-  panel.querySelector("#btn-prev").addEventListener("click", () => {
-      console.log("1")
-      handleGoToPreviousSentence();
-  });
-
-  panel.querySelector("#btn-vocab").addEventListener("click", () => {
-      console.log("2")
-      handleShowVocabulary();
-  });
-
-  panel.querySelector("#btn-speed").addEventListener("click", () => {
-      console.log("3")
-      handleSelectPlaybackSpeed();
-  });
-} 
+}
 
 function findVideoElements() {
   videoPlayer = document.querySelector("video.html5-main-video");
@@ -306,7 +378,7 @@ function startSubtitleDisplay() {
   checkInterval = setInterval(updateSubtitles, 100);
   videoPlayer.addEventListener("play", updateSubtitles);
   videoPlayer.addEventListener("seeked", updateSubtitles);
-  videoPlayer.addEventListener("pause", hideCurrentSubtitle);
+  videoPlayer.addEventListener("pause", handleShowVocabulary)
 }
 
 function stopSubtitleDisplay() {
@@ -317,7 +389,7 @@ function stopSubtitleDisplay() {
   if (videoPlayer) {
     videoPlayer.removeEventListener("play", updateSubtitles);
     videoPlayer.removeEventListener("seeked", updateSubtitles);
-    videoPlayer.removeEventListener("pause", hideCurrentSubtitle);
+    videoPlayer.removeEventListener("pause", handleShowVocabulary)
   }
 }
 
@@ -364,6 +436,7 @@ function requestSubtitles(container) {
   updateSubtitles();
 }
 
+// 视频暂停时获当前句子可能的生词
 function handleVideoPause() {
   if (!videoPlayer) return;
   const currentTimestamp = videoPlayer.currentTime * 1000;
@@ -377,48 +450,15 @@ function handleVideoPause() {
     return;
   }
 
-  console.log(`Paused at ${currentTimestamp}ms, translating:`, subtitle.text);
-
-  // First verify API key exists
-  chrome.storage.local.get(['geminiApiKey'], function(result) {
-    if (!result.geminiApiKey) {
-      updateSubtitleText(subtitleContainer, "请先设置API密钥");
-      return;
-    }
-
-    // Send translation request with verified API key
-    chrome.runtime.sendMessage(
-      {
-        action: "translateWithGemini",
-        text: subtitle.text,
-        videoId: currentVideoId,
-        timestamp: currentTimestamp,
-        apiKey: result.geminiApiKey
-      },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          console.error("Translation request failed:", chrome.runtime.lastError);
-          updateSubtitleText(subtitleContainer, "翻译连接失败");
-          return;
-        }
-
-        if (response && response.success) {
-          const translatedText = response.translation?.trim() || "翻译解析失败";
-          updateSubtitleText(subtitleContainer, translatedText);
-          console.log("Translation completed:", translatedText);
-        } else {
-          const errorMessage = response?.error === "401" ? "API密钥无效" : "翻译失败";
-          console.error("Translation failed:", response?.error);
-          updateSubtitleText(subtitleContainer, errorMessage);
-        }
-      }
-    );
-  });
+  console.log(`Paused at ${currentTimestamp}ms, get words from:`, subtitle.text);
+  handleShowVocabulary()
 }
 
 function handleVideoPlay() {
   console.log("Video resumed — restoring original subtitles.");
-  requestSubtitles(subtitleContainer);
+  if (vocabPopup && document.body.contains(vocabPopup)) {
+    vocabPopup.remove(); 
+  }
 }
 
 function handleGenerateSubtitles(message, sendResponse) {
@@ -466,7 +506,7 @@ function handleSubtitlesGenerated(message, sendResponse) {
 
 // Assistant function implementations
 function handleGoToPreviousSentence() {
-  console.log("回到上一句 - Going to previous sentence");
+  console.log("Going to previous sentence");
   if (!videoPlayer || !currentSubtitles.length) {
     console.log("No video player or subtitles available");
     return;
@@ -492,8 +532,58 @@ function handleGoToPreviousSentence() {
   }
 }
 
+
+function handleTranslation(){
+  console.log("translating subtitle");
+  if (!videoPlayer || !currentSubtitles.length) {
+    console.log("No video player or subtitles available");
+    return;
+  }
+
+  const currentTime = videoPlayer.currentTime * 1000;
+  const currentSubtitle = currentSubtitles.find(
+    (s) => currentTime >= s.startTime && currentTime <= s.endTime
+  );
+
+  console.log(`try to translate: ${currentSubtitle.text}`);
+  
+  chrome.storage.local.get(['geminiApiKey'], function(result) {
+    if (!result.geminiApiKey) {
+      updateSubtitleText(subtitleContainer, "Please set API Key first.");
+      return;
+    }
+
+    chrome.runtime.sendMessage(
+      {
+        action: "translateWithGemini",
+        text: currentSubtitle.text,
+        videoId: currentVideoId,
+        apiKey: result.geminiApiKey
+      },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("Translation request failed:", chrome.runtime.lastError);
+          updateSubtitleText(subtitleContainer, "Fail to connect translation.");
+          return;
+        }
+
+        if (response && response.success) {
+          const translatedText = response.translation?.trim() || "Translation parsing failed";
+          updateSubtitleText(subtitleContainer, translatedText);
+          console.log("Translation completed:", translatedText);
+        } else {
+          const errorMessage = response?.error === "401" ? "API Key invalid" : "Fail to translate";
+          console.error("Translation failed:", response?.error);
+          updateSubtitleText(subtitleContainer, errorMessage);
+        }
+      }
+    );
+  });
+
+}
+
 function handleShowVocabulary() {
-    console.log("显示生词 - Showing vocabulary");
+    console.log("Showing vocabulary");
     if (!videoPlayer || !currentSubtitles.length) {
       console.log("No video player or subtitles available");
       return;
@@ -508,12 +598,13 @@ function handleShowVocabulary() {
       // First verify API key exists
       chrome.storage.local.get(['geminiApiKey'], function(result) {
         if (!result.geminiApiKey) {
-          showMessage("请先设置API密钥");
+          showMessage("Please set API key first.");
           return;
         }
   
         // Create loading popup
-        const vocabPopup = document.createElement("div");
+        if (vocabPopup) vocabPopup.remove(); // 如果已存在旧popup先清除
+        vocabPopup = document.createElement("div");
         vocabPopup.id = "vocabulary-popup";
         vocabPopup.style.position = "fixed";
         vocabPopup.style.top = "50%";
@@ -521,7 +612,7 @@ function handleShowVocabulary() {
         vocabPopup.style.transform = "translate(-50%, -50%)";
         vocabPopup.style.background = "rgba(0,0,0,0.9)";
         vocabPopup.style.color = "white";
-        vocabPopup.style.padding = "20px";
+        vocabPopup.style.padding = "10px 14px";
         vocabPopup.style.borderRadius = "10px";
         vocabPopup.style.zIndex = "100000";
         vocabPopup.style.maxWidth = "400px";
@@ -529,53 +620,12 @@ function handleShowVocabulary() {
         vocabPopup.style.cursor = "move";
         vocabPopup.style.userSelect = "none";
         vocabPopup.innerHTML = `
-          <h3 style="margin: 0 0 15px 0;">词汇分析中...</h3>
-          <p style="margin: 0 0 10px 0; font-size: 16px;">"${currentSubtitle.text}"</p>
-          <p style="margin: 0 0 15px 0; color: #ccc;">请稍候</p>
+          <h3 style="margin: 0 0 15px 0;">Analyzing...</h3>
+          <p style="margin: 0 0 15px 0; color: #ccc;">Please wait</p>
         `;
         
         document.body.appendChild(vocabPopup);
-
-        // 拖拽逻辑
-        // let isDragging = false, offsetX, offsetY;
-        // panel.addEventListener("mousedown", (e) => {
-        //     isDragging = true;
-        //     offsetX = e.clientX - panel.offsetLeft;
-        //     offsetY = e.clientY - panel.offsetTop;
-        // });
-        // document.addEventListener("mousemove", (e) => {
-        //     if (isDragging) {
-        //         panel.style.left = e.clientX - offsetX + "px";
-        //         panel.style.top = e.clientY - offsetY + "px";
-        //         panel.style.right = "auto";
-        //     }
-        // });
-        // document.addEventListener("mouseup", () => (isDragging = false));
-
-        // 添加拖拽功能（带防误触关闭）
-        let isDragging = false, didDrag = false, offsetX, offsetY, startX = 0, startY = 0;
-        vocabPopup.addEventListener("mousedown", (e) => {
-            isDragging = true;
-            didDrag = false;
-            startX = e.clientX;
-            startY = e.clientY;
-            offsetX = e.clientX - vocabPopup.offsetLeft;
-            offsetY = e.clientY - vocabPopup.offsetTop;
-        });
-        document.addEventListener("mousemove", (e) => {
-            if (isDragging) {
-                const dx = Math.abs(e.clientX - startX);
-                const dy = Math.abs(e.clientY - startY);
-                if (!didDrag && (dx > 3 || dy > 3)) didDrag = true; // 阈值避免轻微抖动
-                vocabPopup.style.left = e.clientX - offsetX + "px";
-                vocabPopup.style.top = e.clientY - offsetY + "px";
-            }
-        });
-        document.addEventListener("mouseup", () => {
-            isDragging = false;
-            // 在点击事件之后重置，确保click能检测到didDrag
-            setTimeout(() => { didDrag = false; }, 0);
-        });
+        dragFloatingWindow(vocabPopup)
   
         // Request vocabulary extraction
         chrome.runtime.sendMessage(
@@ -586,9 +636,8 @@ function handleShowVocabulary() {
           async function(response) {
             if (chrome.runtime.lastError) {
               vocabPopup.innerHTML = `
-                <h3 style="margin: 0 0 15px 0;">分析失败</h3>
-                <p style="margin: 0 0 10px 0; color: #ff6b6b;">请稍后重试</p>
-                <p style="margin: 0 0 15px 0; color: #ccc;">点击关闭</p>
+                <h3 style="margin: 0 0 15px 0;">Failed to analyze</h3>
+                <p style="margin: 0 0 10px 0; color: #ff6b6b;">Please try later</p>
               `;
               return;
             }
@@ -654,51 +703,46 @@ function handleShowVocabulary() {
                       <span style="color: #666;">-</span>
                       <span style="color: #4CAF50;">${translation}</span>
                       ${isSaved ?
-                      `<span style="color: #FDD835; font-size: 12px;">已保存</span>` :
+                      `<button
+                        style="background: transparent; border: 1px solid #FDD835; color: #FDD835;
+                        padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                        Saved</button>` : 
                       `<button 
                           class="add-word-btn" 
-                          style="
-                            background: transparent;
-                            border: 1px solid #4CAF50;
-                            color: #4CAF50;
-                            padding: 2px 8px;
-                            border-radius: 4px;
-                            cursor: pointer;
-                            font-size: 12px;
-                          "
+                          style="background: transparent; border: 1px solid #4CAF50; color: #4CAF50;
+                          padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;"
                           data-word="${word}"
                           data-translation="${translation}"
-                        >添加</button>`}
+                        >Add</button>`}
                     </div>
                   `;
                 })
                 .join('');
 
               vocabPopup.innerHTML = `
-                <p style="margin: 0 0 15px 0; font-size: 16px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px;">
-                  "${highlightedText}"
-                </p>
                 <div style="margin: 15px 0;">
                   ${vocabLines}
                 </div>
-                <p style="margin: 10px 0 0 0; color: #999; font-size: 12px; text-align: center;">关闭</p>
               `;
 
               // Add click handlers for add buttons
               vocabPopup.querySelectorAll('.add-word-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                   e.stopPropagation(); // Prevent popup from closing
-                  const word = btn.dataset.word;
-                  const translation = btn.dataset.translation;
-                  await addToSavedWords(word, translation);
-                  btn.outerHTML = `<span style="color: #FDD835; font-size: 12px;">已保存</span>`;
+                  // const word = btn.dataset.word;
+                  // const translation = btn.dataset.translation;
+                  // await addToSavedWords(word, translation);
+                  btn.outerHTML = 
+                  `<button
+                    style = "background: transparent; border: 1px solid #FDD835; color: #FDD835;
+                    padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                    Saved</button>`
                 });
               });
             } else {
               vocabPopup.innerHTML = `
-                <h3 style="margin: 0 0 15px 0;">分析失败</h3>
-                <p style="margin: 0 0 10px 0; color: #ff6b6b;">${response?.error || '未知错误'}</p>
-                <p style="margin: 0 0 15px 0; color: #ccc;">点击关闭</p>
+                <h3 style="margin: 0 0 15px 0;">Fail to analyze</h3>
+                <p style="margin: 0 0 10px 0; color: #ff6b6b;">${response?.error || 'Unkown fault'}</p>
               `;
             }
           }
@@ -711,199 +755,145 @@ function handleShowVocabulary() {
           }
         });
         
-        // Auto close after 15 seconds (increased from 5s for reading time)
-        setTimeout(() => {
-          if (document.body.contains(vocabPopup)) {
-            document.body.removeChild(vocabPopup);
-          }
-        }, 15000);
       });
     } else {
       console.log("No current subtitle found");
     }
   }
 
+
+function handleShowWordNotebook() {
+  console.log("showing all saved word");
+  const container = document.getElementById("notebook-container");
+  if (!container) return;
+
+  if (container.style.display === "none") {
+    container.style.display = "block";
+  } else {
+    container.style.display = "none";
+    return;
+  }
+
+  chrome.storage.local.get(["savedWords"], (result) => {
+    const savedWords = result.savedWords || {};
+
+    // 空的情况
+    if (Object.keys(savedWords).length === 0) {
+      container.innerHTML = `<div style="text-align:center; color:#bbb;">No saved words yet.</div>`;
+      return;
+    }
+
+    // 生成 HTML
+    container.innerHTML = Object.entries(savedWords)
+      .map(
+        ([word, meaning]) => `
+        <div style="
+          background: rgba(255,255,255,0.08); border-radius:6px; padding:6px 8px;
+          margin-bottom:6px; text-align:left;">
+          <div style="
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            column-gap: 10px;
+          ">
+            <div style="display: flex; flex-direction: column;">
+              <div style="color:#ffcc00; font-weight:bold; font-size:14px;">${word}</div>
+              <div style="color:#ddd; font-size:12px; margin-top:4px;">${meaning}</div>
+            </div>
+            <button 
+              class="ai-example-btn"
+              data-word="${word}"
+              style="
+                background:#0078ff; color:#fff; border:none; border-radius:6px; 
+                font-size:11px; padding:8px 10px; cursor:pointer; height:100%;
+              ">AI Sentence</button>
+          </div>
+        </div>
+      `
+      )
+      .join("");
+
+      document.querySelectorAll(".ai-example-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          const word = e.target.dataset.word;
+          console.log(`Generating AI example for: ${word}`);
+  
+          chrome.storage.local.get(['geminiApiKey'], function(result) {
+            if (!result.geminiApiKey) {
+              updateSubtitleText(subtitleContainer, "Please set API Key first.");
+              return;
+            }
+
+            chrome.runtime.sendMessage(
+              {
+                action: "generateExampleSentence",
+                text: word,
+                videoId: currentVideoId,
+                apiKey: result.geminiApiKey
+              },
+              (response) => {
+                if (chrome.runtime.lastError) {
+                  console.error("Generating sentense request failed:", chrome.runtime.lastError);
+                  return;
+                }
+                if (response && response.success) {
+                  const generatedSentence = response.sentence?.trim() || "Sentence parsing failed";
+                  console.log("Generation completed:", generatedSentence);
+                } else {
+                  const errorMessage = response?.error === "401" ? "API Key invalid" : "Fail to generate";
+                  console.error("Generation failed:", response?.error);
+                }
+              }
+            );
+          });  
+        });
+      });
+  });
+}
+
+
 function handleSelectPlaybackSpeed() {
-  console.log("选择倍速 - Selecting playback speed for current sentence");
+  console.log("Selecting playback speed for current sentence");
   if (!videoPlayer || !currentSubtitles.length) {
     console.log("No video player or subtitles available");
     return;
   }
 
+  const speedSelect = document.querySelector("#speed-select");
+  const speed = parseFloat(speedSelect.value);
+  const btnLoop = document.querySelector("#btn-speed");
+
   const currentTime = videoPlayer.currentTime * 1000;
   const currentSubtitle = currentSubtitles.find(
-    (s) => currentTime >= s.startTime && currentTime <= s.endTime
+    s => currentTime >= s.startTime && currentTime <= s.endTime
   );
 
   if (!currentSubtitle) {
-    showMessage("请先暂停在某个句子上");
+    alert("Please pause on specific sentence.");
     return;
   }
 
-  // Create a speed selection popup
-  const speedPopup = document.createElement("div");
-  speedPopup.id = "speed-popup";
-  speedPopup.style.position = "fixed";
-  speedPopup.style.top = "50%";
-  speedPopup.style.left = "50%";
-  speedPopup.style.transform = "translate(-50%, -50%)";
-  speedPopup.style.background = "rgba(0,0,0,0.9)";
-  speedPopup.style.color = "white";
-  speedPopup.style.padding = "20px";
-  speedPopup.style.borderRadius = "10px";
-  speedPopup.style.zIndex = "100000";
-  speedPopup.style.textAlign = "center";
-  speedPopup.style.maxWidth = "400px";
-  speedPopup.style.cursor = "move";
-  speedPopup.style.userSelect = "none";
-  
-  const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-  
-  speedPopup.innerHTML = `
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
-      ${speeds.map(speed => `
-        <button class="speed-btn" style="
-          background: #333;
-          color: white;
-          border: none;
-          padding: 10px;
-          border-radius: 5px;
-          cursor: pointer;
-          transition: background-color 0.2s;
-        " data-speed="${speed}">${speed}x</button>
-      `).join('')}
-    </div>
-    <button id="stop-loop-btn" style="
-      background: #ff4444;
-      color: white;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 5px;
-      cursor: pointer;
-      margin-right: 10px;
-    ">Break</button>
-  `;
-  
-  document.body.appendChild(speedPopup);
-
-  // 添加拖拽功能（带防误触关闭）
-  let isDragging = false, didDrag = false, offsetX, offsetY, startX = 0, startY = 0;
-  speedPopup.addEventListener("mousedown", (e) => {
-      isDragging = true;
-      didDrag = false;
-      startX = e.clientX;
-      startY = e.clientY;
-      offsetX = e.clientX - speedPopup.offsetLeft;
-      offsetY = e.clientY - speedPopup.offsetTop;
-      speedPopup.style.transform = "none"; // 移除transform以便拖拽
-  });
-  document.addEventListener("mousemove", (e) => {
-      if (isDragging) {
-          const dx = Math.abs(e.clientX - startX);
-          const dy = Math.abs(e.clientY - startY);
-          if (!didDrag && (dx > 3 || dy > 3)) didDrag = true; // 阈值避免轻微抖动
-          speedPopup.style.left = e.clientX - offsetX + "px";
-          speedPopup.style.top = e.clientY - offsetY + "px";
-      }
-  });
-  document.addEventListener("mouseup", () => {
-      isDragging = false;
-      setTimeout(() => { didDrag = false; }, 0);
-  });
-  
-  let loopInterval = null;
-  let isLooping = false;
-  
-  // Add click handlers for speed buttons
-  speedPopup.querySelectorAll('button[data-speed]').forEach(button => {
-    // Add hover effects
-    button.addEventListener('mouseenter', () => {
-      if (!button.classList.contains('selected')) {
-        button.style.background = '#555';
-      }
-    });
-    button.addEventListener('mouseleave', () => {
-      if (!button.classList.contains('selected')) {
-        button.style.background = '#333';
-      }
-    });
-
-    button.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const speed = parseFloat(button.dataset.speed);
-      
-      // Stop any existing loop
-      if (loopInterval) {
-        clearInterval(loopInterval);
-      }
-      
-      // Start new loop
-      startSentenceLoop(currentSubtitle, speed);
-      isLooping = true;
-      
-      // Update UI to show current speed - remove selected class from all buttons first
-      speedPopup.querySelectorAll('button[data-speed]').forEach(btn => {
-        btn.classList.remove('selected');
-        btn.style.background = '#333';
-      });
-      
-      // Add selected class and style to clicked button
-      button.classList.add('selected');
-      button.style.background = '#0078ff';
-      
-      console.log(`Started looping sentence at ${speed}x speed`);
-    });
-  });
-  
-  // Stop loop button
-  const stopBtn = speedPopup.querySelector('#stop-loop-btn');
-  stopBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (loopInterval) {
-      clearInterval(loopInterval);
-      loopInterval = null;
-      isLooping = false;
-      videoPlayer.playbackRate = 1.0; // Reset to normal speed
-      console.log("Stopped sentence loop");
-    }
-    // Close the popup when break is clicked
-    document.body.removeChild(speedPopup);
-  });
-  
-  // Close popup when clicked outside buttons（拖拽后不关闭）
-  speedPopup.addEventListener("click", (e) => {
-    if (e.target === speedPopup && !didDrag) {
-      if (loopInterval) {
-        clearInterval(loopInterval);
-      }
-      document.body.removeChild(speedPopup);
-    }
-  });
-  
-  // Function to start sentence loop
-  function startSentenceLoop(subtitle, speed) {
-    if (loopInterval) {
-      clearInterval(loopInterval);
-    }
-    
-    // Set playback speed
-    videoPlayer.playbackRate = speed;
-    
-    // Calculate loop duration
-    const loopDuration = (subtitle.endTime - subtitle.startTime) / 1000; // in seconds
-    const loopIntervalMs = loopDuration * 1000; // in milliseconds
-    
-    // Start the loop
-    videoPlayer.currentTime = subtitle.startTime / 1000;
+  if (loopInterval) {
+    clearInterval(loopInterval);
+    loopInterval = null;
+    videoPlayer.playbackRate = 1.0;
+    btnLoop.textContent = "Single Sentence Loop";
     videoPlayer.play();
-    
-    loopInterval = setInterval(() => {
-      if (videoPlayer.currentTime * 1000 >= subtitle.endTime) {
-        // Reset to start of sentence
-        videoPlayer.currentTime = subtitle.startTime / 1000;
-      }
-    }, 100); // Check every 100ms
-    
-    console.log(`Looping sentence: "${subtitle.text}" at ${speed}x speed`);
+    console.log("Stopped single sentence loop");
+    return;
   }
+
+  // 开始循环
+  videoPlayer.playbackRate = speed;
+  videoPlayer.currentTime = currentSubtitle.startTime / 1000;
+  videoPlayer.play();
+
+  loopInterval = setInterval(() => {
+    if (videoPlayer.currentTime * 1000 >= currentSubtitle.endTime) {
+      videoPlayer.currentTime = currentSubtitle.startTime / 1000;
+    }
+  }, 50);
+
+  btnLoop.textContent = "Continue Playing"; // 更新按钮文字
+  console.log(`Started single sentence loop at ${speed}x speed`);
 }

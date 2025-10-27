@@ -29,12 +29,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const apiKey = apiKeyInput.value.trim();
 
     if (!tarlang || !level || !apiKey) {
-      alert("请完整填写所有选项！");
+      alert("Please fill all the infomation!");
       return;
     }
 
     chrome.storage.local.set({ geminiApiKey: apiKey, tarlang, level }, () => {
-      alert("设置已保存！");
+      alert("saved!");
       profilePage.classList.add("hidden");
       subtitlePage.classList.remove("hidden");
     });
@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", function () {
     chrome.storage.local.get(["geminiApiKey"], function (result) {
       const apiKey = result.geminiApiKey?.trim();
       if (!apiKey) {
-        statusDiv.textContent = "请先输入并保存 API Key。";
+        statusDiv.textContent = "Please enter the API Key first.";
         return;
       }
 
