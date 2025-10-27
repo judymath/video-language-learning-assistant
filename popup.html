@@ -5,7 +5,6 @@
     <title>YouTube Subtitles Generator</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
-      /* Root variables for consistent styling */
       :root {
         --radius: 0.5rem;
         --input-padding: 0.5rem 0.75rem;
@@ -18,9 +17,8 @@
         --primary-hover: #dc2626;
       }
 
-      /* General body styling */
       body {
-        width: 300px;
+        width: 320px;
         padding: 16px;
         margin: 0;
         font-family: system-ui, sans-serif;
@@ -28,46 +26,47 @@
         color: var(--text);
       }
 
-      /* Container for layout */
-      .container {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-      }
-
-      /* Header styling */
-      h2 {
+      h3 {
         font-size: 16px;
+        margin-bottom: 10px;
+        color: var(--muted);
+      }
+
+      fieldset {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 8px 12px;
+        margin-bottom: 12px;
+      }
+
+      legend {
         font-weight: 600;
-        margin: 0;
+        font-size: 13px;
       }
 
-      /* Label styling */
       label {
+        display: block;
         font-size: var(--font-size);
-        font-weight: 500;
-        margin-bottom: 4px;
+        margin-top: 4px;
       }
 
-      /* Input field styling */
-      input {
+      input[type="password"],
+      input[type="text"] {
         padding: var(--input-padding);
         font-size: var(--font-size);
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        outline: none;
         width: 100%;
         box-sizing: border-box;
-        transition: border-color 0.2s, box-shadow 0.2s;
+        margin-top: 4px;
       }
 
-      /* Input focus styling */
       input:focus {
         border-color: var(--primary);
         box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+        outline: none;
       }
 
-      /* Button styling */
       button {
         background-color: var(--primary);
         color: white;
@@ -78,56 +77,66 @@
         border-radius: var(--radius);
         cursor: pointer;
         transition: background-color 0.2s;
+        width: 100%;
+        box-sizing: border-box;
       }
 
-      /* Button hover effect */
       button:hover {
         background-color: var(--primary-hover);
       }
 
-      /* Status message styling */
       .status {
         font-size: var(--font-size);
         color: var(--muted);
-        margin-top: 4px;
+        margin-top: 8px;
       }
 
-      /* Existing subtitles message styling */
-      .existing-subtitles {
-        font-size: var(--font-size);
-        color: green;
-        margin-top: 10px;
+      .hidden {
+        display: none;
       }
     </style>
   </head>
   <body>
-    <!-- Main container for the popup -->
-    <div class="container">
+    <!-- 页面 1：Profile 设置 -->
+    <div id="profilePage">
+      <h3>学习设置</h3>
 
-      <!-- Settings Section -->
-        <h3 style="font-size: 14px; margin: 0 0 10px 0; color: var(--muted);">设置</h3>
-        
-        <!-- Input for Gemini API Key -->
-        <div>
-          <label for="apiKey">Gemini API Key</label>
-          <input
-            type="password"
-            id="apiKey"
-            placeholder="Enter your Gemini API Key"
-          />
-        </div>
+      <fieldset>
+        <legend>目标学习语言</legend>
+        <label><input type="radio" name="tarlang" value="english" /> 英语</label>
+        <label><input type="radio" name="tarlang" value="french" /> 法语</label>
+        <label><input type="radio" name="tarlang" value="japanese" /> 日语</label>
+      </fieldset>
 
-        <!-- Generate Subtitles Button -->
-        <button id="generateBtn" style="margin-top: 10px;">Generate Caption Closed</button>
+      <fieldset>
+        <legend>当前水平</legend>
+        <label><input type="radio" name="level" value="A1" /> A1</label>
+        <label><input type="radio" name="level" value="A2" /> A2</label>
+        <label><input type="radio" name="level" value="B1" /> B1</label>
+      </fieldset>
 
-        <!-- Message for existing subtitles -->
-        <div class="existing-subtitles" id="existingSubtitles"></div>
+      <div>
+        <label for="apiKey">Gemini API Key</label>
+        <input
+          type="password"
+          id="apiKey"
+          placeholder="Enter your Gemini API Key"
+        />
+      </div>
 
-        <!-- Status message -->
-        <div class="status" id="status"></div>
+      <button id="saveProfileBtn" style="margin-top: 10px">
+        保存并继续
+      </button>
     </div>
 
-    <!-- Link to the popup.js script -->
+    <!-- 页面 2：字幕生成 -->
+    <div id="subtitlePage" class="hidden">
+      <h3>YouTube 字幕生成</h3>
+      <button id="generateBtn">Generate Caption Closed</button>
+      <div id="existingSubtitles" style="color: green; margin-top: 8px;"></div>
+      <div class="status" id="status"></div>
+    </div>
+
     <script src="popup.js"></script>
   </body>
 </html>

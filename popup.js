@@ -1,39 +1,54 @@
 document.addEventListener("DOMContentLoaded", function () {
   // DOM elements
+  const profilePage = document.getElementById("profilePage");
+  const subtitlePage = document.getElementById("subtitlePage");
+
   const apiKeyInput = document.getElementById("apiKey");
+  const saveProfileBtn = document.getElementById("saveProfileBtn");
   const generateBtn = document.getElementById("generateBtn");
   const statusDiv = document.getElementById("status");
+  const existingSubtitlesDiv = document.getElementById("existingSubtitles");
 
-  // Create a div for displaying existing subtitles message
-  const existingSubtitlesDiv = document.createElement("div");
-  existingSubtitlesDiv.id = "existingSubtitles";
-  existingSubtitlesDiv.style.marginTop = "10px";
-  existingSubtitlesDiv.style.color = "green";
-  generateBtn.parentNode.insertBefore(
-    existingSubtitlesDiv,
-    generateBtn.nextSibling
-  ); // Add it below the button
-
-  // Load saved API key from local storage
-  chrome.storage.local.get(["geminiApiKey"], function (result) {
-    if (result.geminiApiKey) {
-      apiKeyInput.value = result.geminiApiKey;
+  // 初始化页面逻辑
+  chrome.storage.local.get(["geminiApiKey", "tarlang", "level"], function (result) {
+    if (result.geminiApiKey && result.tarlang && result.level) {
+      // 已保存 -> 显示字幕页
+      profilePage.classList.add("hidden");
+      subtitlePage.classList.remove("hidden");
+    } else {
+      // 未保存 -> 显示设置页
+      profilePage.classList.remove("hidden");
+      subtitlePage.classList.add("hidden");
     }
   });
 
-  // Helper function to clean YouTube URLs
+  // 保存设置按钮逻辑
+  saveProfileBtn.addEventListener("click", () => {
+    const tarlang = document.querySelector('input[name="tarlang"]:checked')?.value;
+    const level = document.querySelector('input[name="level"]:checked')?.value;
+    const apiKey = apiKeyInput.value.trim();
+
+    if (!tarlang || !level || !apiKey) {
+      alert("请完整填写所有选项！");
+      return;
+    }
+
+    chrome.storage.local.set({ geminiApiKey: apiKey, tarlang, level }, () => {
+      alert("设置已保存！");
+      profilePage.classList.add("hidden");
+      subtitlePage.classList.remove("hidden");
+    });
+  });
+
+  // 工具函数：清理 YouTube URL
   function cleanYouTubeUrl(originalUrl) {
     try {
       const url = new URL(originalUrl);
       const videoId = url.searchParams.get("v");
-      if (videoId) {
-        // Reconstruct a minimal URL
-        return `${url.protocol}//${url.hostname}${url.pathname}?v=${videoId}`;
-      }
+      if (videoId) return `${url.protocol}//${url.hostname}${url.pathname}?v=${videoId}`;
     } catch (e) {
-      console.error("Error parsing URL for cleaning:", originalUrl, e);
+      console.error("Error parsing URL for cleaning:", e);
     }
-    // Fallback to original if cleaning fails or no 'v' param found
     return originalUrl;
   }
 
@@ -73,77 +88,51 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
   });
-
-  // Handle the "Generate Subtitles" button click
+  
+  // 生成字幕按钮逻辑
   generateBtn.addEventListener("click", function () {
-    const apiKey = apiKeyInput.value.trim();
-    statusDiv.textContent = ""; // Clear previous status
+    chrome.storage.local.get(["geminiApiKey"], function (result) {
+      const apiKey = result.geminiApiKey?.trim();
+      if (!apiKey) {
+        statusDiv.textContent = "请先输入并保存 API Key。";
+        return;
+      }
 
-    if (!apiKey) {
-      statusDiv.textContent = "Please enter a valid API key";
-      return;
-    }
+      statusDiv.textContent = "Requesting subtitles...";
+      generateBtn.disabled = true;
 
-    // Save the API key to local storage
-    chrome.storage.local.set({ geminiApiKey: apiKey });
-
-    // Show loading status
-    statusDiv.textContent = "Requesting subtitles...";
-    generateBtn.disabled = true; // Disable button during processing
-
-    // Query the active tab
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-      const currentTab = tabs[0];
-      console.log(
-        "Popup: Active tab URL:",
-        currentTab ? currentTab.url : "No tab found"
-      );
-
-      if (
-        currentTab &&
-        currentTab.url &&
-        currentTab.url.includes("youtube.com/watch")
-      ) {
-
-        // Send a message to the content script to generate subtitles
-        chrome.tabs.sendMessage(
-          currentTab.id,
-          { action: "generateSubtitles", apiKey: apiKey },
-          function (response) {
-            if (chrome.runtime.lastError) {
-              console.error("Popup Error:", chrome.runtime.lastError.message);
-              statusDiv.textContent = `Error: ${chrome.runtime.lastError.message}. Try reloading the YouTube page.`;
-              generateBtn.disabled = false;
-            } else if (response && response.status === "started") {
-              statusDiv.textContent =
-                "Processing video... (This may take a while)";
-            } else if (response && response.status === "error") {
-              statusDiv.textContent = `Error: ${
-                response.message || "Could not start process."
-              }`;
-              generateBtn.disabled = false;
-            } else {
-              statusDiv.textContent =
-                "Error: Unexpected response from content script.";
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        const currentTab = tabs[0];
+        if (currentTab?.url?.includes("youtube.com/watch")) {
+          chrome.tabs.sendMessage(
+            currentTab.id,
+            { action: "generateSubtitles", apiKey },
+            function (response) {
+              if (chrome.runtime.lastError) {
+                statusDiv.textContent = `Error: ${chrome.runtime.lastError.message}`;
+              } else if (response?.status === "started") {
+                statusDiv.textContent = "Processing video... (This may take a while)";
+              } else if (response?.status === "error") {
+                statusDiv.textContent = `Error: ${response.message || "Could not start process."}`;
+              } else {
+                statusDiv.textContent = "Unexpected response from content script.";
+              }
               generateBtn.disabled = false;
             }
-          }
-        );
-      } else {
-        statusDiv.textContent = "Not a YouTube video page.";
-        generateBtn.disabled = false;
-      }
+          );
+        } else {
+          statusDiv.textContent = "Not a YouTube video page.";
+          generateBtn.disabled = false;
+        }
+      });
     });
   });
 
-  // Listen for status updates from the background script
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // 接收后台状态更新
+  chrome.runtime.onMessage.addListener((message) => {
     if (message.action === "updatePopupStatus") {
       statusDiv.textContent = message.text;
-      if (message.error || message.success) {
-        generateBtn.disabled = false; // Re-enable button on completion or error
-      }
+      if (message.error || message.success) generateBtn.disabled = false;
     }
   });
-
 });
