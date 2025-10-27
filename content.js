@@ -123,7 +123,12 @@ function initialize() {
 }
 
 function createFloatingPanel() {
-  if (document.getElementById("extension-floating-panel")) return;
+  // 如果悬浮窗已存在，显示它而不是创建新的
+  const existingPanel = document.getElementById("extension-floating-panel");
+  if (existingPanel) {
+    existingPanel.style.display = "block";
+    return;
+  }
 
   const panel = document.createElement("div");
   panel.id = "extension-floating-panel";
@@ -135,7 +140,7 @@ function createFloatingPanel() {
   panel.style.border = "1px solid rgba(255,255,255,0.2)";
   panel.style.borderRadius = "10px";
   panel.style.color = "#fff";
-  panel.style.zIndex = "99999";
+  panel.style.zIndex = "2147483647"; // 使用最大z-index值
   panel.style.padding = "10px";
   panel.style.fontSize = "14px";
   panel.style.fontFamily = "Arial, sans-serif";
@@ -143,7 +148,13 @@ function createFloatingPanel() {
   panel.style.userSelect = "none";
   panel.style.cursor = "move";
   panel.innerHTML = `
-      <div style="font-weight:bold; margin-bottom:6px; text-align:center;">语言学习助手</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <div style="font-weight:bold;">语言学习助手</div>
+        <button id="close-panel" style="
+            background:transparent; color:#fff; border:none; 
+            cursor:pointer; font-size:16px; padding:0; width:20px; height:20px;
+            display:flex; align-items:center; justify-content:center;">×</button>
+      </div>
       <button id="btn-prev" style="
           background:#0078ff; color:#fff; border:none; border-radius:6px;
           padding:6px 10px; width:100%; cursor:pointer;">回到上一句</button>
@@ -173,6 +184,12 @@ function createFloatingPanel() {
       }
   });
   document.addEventListener("mouseup", () => (isDragging = false));
+
+  // 关闭按钮事件绑定
+  panel.querySelector("#close-panel").addEventListener("click", (e) => {
+      e.stopPropagation(); // 防止触发拖拽
+      document.body.removeChild(panel);
+  });
 
   // 按钮事件绑定
   panel.querySelector("#btn-prev").addEventListener("click", () => {
@@ -509,6 +526,8 @@ function handleShowVocabulary() {
         vocabPopup.style.zIndex = "100000";
         vocabPopup.style.maxWidth = "400px";
         vocabPopup.style.textAlign = "center";
+        vocabPopup.style.cursor = "move";
+        vocabPopup.style.userSelect = "none";
         vocabPopup.innerHTML = `
           <h3 style="margin: 0 0 15px 0;">词汇分析中...</h3>
           <p style="margin: 0 0 10px 0; font-size: 16px;">"${currentSubtitle.text}"</p>
@@ -516,6 +535,47 @@ function handleShowVocabulary() {
         `;
         
         document.body.appendChild(vocabPopup);
+
+        // 拖拽逻辑
+        // let isDragging = false, offsetX, offsetY;
+        // panel.addEventListener("mousedown", (e) => {
+        //     isDragging = true;
+        //     offsetX = e.clientX - panel.offsetLeft;
+        //     offsetY = e.clientY - panel.offsetTop;
+        // });
+        // document.addEventListener("mousemove", (e) => {
+        //     if (isDragging) {
+        //         panel.style.left = e.clientX - offsetX + "px";
+        //         panel.style.top = e.clientY - offsetY + "px";
+        //         panel.style.right = "auto";
+        //     }
+        // });
+        // document.addEventListener("mouseup", () => (isDragging = false));
+
+        // 添加拖拽功能（带防误触关闭）
+        let isDragging = false, didDrag = false, offsetX, offsetY, startX = 0, startY = 0;
+        vocabPopup.addEventListener("mousedown", (e) => {
+            isDragging = true;
+            didDrag = false;
+            startX = e.clientX;
+            startY = e.clientY;
+            offsetX = e.clientX - vocabPopup.offsetLeft;
+            offsetY = e.clientY - vocabPopup.offsetTop;
+        });
+        document.addEventListener("mousemove", (e) => {
+            if (isDragging) {
+                const dx = Math.abs(e.clientX - startX);
+                const dy = Math.abs(e.clientY - startY);
+                if (!didDrag && (dx > 3 || dy > 3)) didDrag = true; // 阈值避免轻微抖动
+                vocabPopup.style.left = e.clientX - offsetX + "px";
+                vocabPopup.style.top = e.clientY - offsetY + "px";
+            }
+        });
+        document.addEventListener("mouseup", () => {
+            isDragging = false;
+            // 在点击事件之后重置，确保click能检测到didDrag
+            setTimeout(() => { didDrag = false; }, 0);
+        });
   
         // Request vocabulary extraction
         chrome.runtime.sendMessage(
@@ -644,9 +704,11 @@ function handleShowVocabulary() {
           }
         );
         
-        // Close popup when clicked
-        vocabPopup.addEventListener("click", () => {
-          document.body.removeChild(vocabPopup);
+        // Close popup when clicked（拖拽后不关闭）
+        vocabPopup.addEventListener("click", (e) => {
+          if (!didDrag) {
+            document.body.removeChild(vocabPopup);
+          }
         });
         
         // Auto close after 15 seconds (increased from 5s for reading time)
@@ -692,16 +754,15 @@ function handleSelectPlaybackSpeed() {
   speedPopup.style.zIndex = "100000";
   speedPopup.style.textAlign = "center";
   speedPopup.style.maxWidth = "400px";
+  speedPopup.style.cursor = "move";
+  speedPopup.style.userSelect = "none";
   
   const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
   
   speedPopup.innerHTML = `
-    <p style="margin: 0 0 15px 0; font-size: 14px; color: #ccc;">
-      "${currentSubtitle.text}"
-    </p>
     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
       ${speeds.map(speed => `
-        <button style="
+        <button class="speed-btn" style="
           background: #333;
           color: white;
           border: none;
@@ -709,7 +770,7 @@ function handleSelectPlaybackSpeed() {
           border-radius: 5px;
           cursor: pointer;
           transition: background-color 0.2s;
-        " data-speed="${speed}" onmouseover="this.style.background='#555'" onmouseout="this.style.background='#333'">${speed}x</button>
+        " data-speed="${speed}">${speed}x</button>
       `).join('')}
     </div>
     <button id="stop-loop-btn" style="
@@ -724,12 +785,49 @@ function handleSelectPlaybackSpeed() {
   `;
   
   document.body.appendChild(speedPopup);
+
+  // 添加拖拽功能（带防误触关闭）
+  let isDragging = false, didDrag = false, offsetX, offsetY, startX = 0, startY = 0;
+  speedPopup.addEventListener("mousedown", (e) => {
+      isDragging = true;
+      didDrag = false;
+      startX = e.clientX;
+      startY = e.clientY;
+      offsetX = e.clientX - speedPopup.offsetLeft;
+      offsetY = e.clientY - speedPopup.offsetTop;
+      speedPopup.style.transform = "none"; // 移除transform以便拖拽
+  });
+  document.addEventListener("mousemove", (e) => {
+      if (isDragging) {
+          const dx = Math.abs(e.clientX - startX);
+          const dy = Math.abs(e.clientY - startY);
+          if (!didDrag && (dx > 3 || dy > 3)) didDrag = true; // 阈值避免轻微抖动
+          speedPopup.style.left = e.clientX - offsetX + "px";
+          speedPopup.style.top = e.clientY - offsetY + "px";
+      }
+  });
+  document.addEventListener("mouseup", () => {
+      isDragging = false;
+      setTimeout(() => { didDrag = false; }, 0);
+  });
   
   let loopInterval = null;
   let isLooping = false;
   
   // Add click handlers for speed buttons
   speedPopup.querySelectorAll('button[data-speed]').forEach(button => {
+    // Add hover effects
+    button.addEventListener('mouseenter', () => {
+      if (!button.classList.contains('selected')) {
+        button.style.background = '#555';
+      }
+    });
+    button.addEventListener('mouseleave', () => {
+      if (!button.classList.contains('selected')) {
+        button.style.background = '#333';
+      }
+    });
+
     button.addEventListener('click', (e) => {
       e.stopPropagation();
       const speed = parseFloat(button.dataset.speed);
@@ -743,10 +841,15 @@ function handleSelectPlaybackSpeed() {
       startSentenceLoop(currentSubtitle, speed);
       isLooping = true;
       
-      // Update UI to show current speed
+      // Update UI to show current speed - remove selected class from all buttons first
       speedPopup.querySelectorAll('button[data-speed]').forEach(btn => {
-        btn.style.background = btn === button ? '#0078ff' : '#333';
+        btn.classList.remove('selected');
+        btn.style.background = '#333';
       });
+      
+      // Add selected class and style to clicked button
+      button.classList.add('selected');
+      button.style.background = '#0078ff';
       
       console.log(`Started looping sentence at ${speed}x speed`);
     });
@@ -767,9 +870,9 @@ function handleSelectPlaybackSpeed() {
     document.body.removeChild(speedPopup);
   });
   
-  // Close popup when clicked outside buttons
+  // Close popup when clicked outside buttons（拖拽后不关闭）
   speedPopup.addEventListener("click", (e) => {
-    if (e.target === speedPopup) {
+    if (e.target === speedPopup && !didDrag) {
       if (loopInterval) {
         clearInterval(loopInterval);
       }

@@ -3,11 +3,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const apiKeyInput = document.getElementById("apiKey");
   const generateBtn = document.getElementById("generateBtn");
   const statusDiv = document.getElementById("status");
-  
-  // Assistant button elements
-  const btnPrev = document.getElementById("btn-prev");
-  const btnVocab = document.getElementById("btn-vocab");
-  const btnSpeed = document.getElementById("btn-speed");
 
   // Create a div for displaying existing subtitles message
   const existingSubtitlesDiv = document.createElement("div");
@@ -26,23 +21,33 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
+  // Helper function to clean YouTube URLs
+  function cleanYouTubeUrl(originalUrl) {
+    try {
+      const url = new URL(originalUrl);
+      const videoId = url.searchParams.get("v");
+      if (videoId) {
+        // Reconstruct a minimal URL
+        return `${url.protocol}//${url.hostname}${url.pathname}?v=${videoId}`;
+      }
+    } catch (e) {
+      console.error("Error parsing URL for cleaning:", originalUrl, e);
+    }
+    // Fallback to original if cleaning fails or no 'v' param found
+    return originalUrl;
+  }
+
+  // 检查当前页面并显示悬浮窗
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    const currentTab = tabs[0];
+    if (currentTab && currentTab.url && currentTab.url.includes("youtube.com/watch")) {
+      // 在YouTube页面时，始终显示悬浮窗
+      chrome.tabs.sendMessage(currentTab.id, { action: "showFloatingWindow" });
+    }
+  });
+
   // Check if subtitles already exist for the current video
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-    // Helper function to clean YouTube URLs
-    function cleanYouTubeUrl(originalUrl) {
-      try {
-        const url = new URL(originalUrl);
-        const videoId = url.searchParams.get("v");
-        if (videoId) {
-          // Reconstruct a minimal URL
-          return `${url.protocol}//${url.hostname}${url.pathname}?v=${videoId}`;
-        }
-      } catch (e) {
-        console.error("Error parsing URL for cleaning:", originalUrl, e);
-      }
-      // Fallback to original if cleaning fails or no 'v' param found
-      return originalUrl;
-    }
 
     const currentTab = tabs[0];
     console.log("URL to check:", cleanYouTubeUrl(currentTab.url));
@@ -100,9 +105,6 @@ document.addEventListener("DOMContentLoaded", function () {
         currentTab.url.includes("youtube.com/watch")
       ) {
 
-        // 首先触发 content.js 创建悬浮窗
-        chrome.tabs.sendMessage(currentTab.id, { action: "showFloatingWindow" });
-
         // Send a message to the content script to generate subtitles
         chrome.tabs.sendMessage(
           currentTab.id,
@@ -144,40 +146,4 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // Assistant button event listeners
-  btnPrev.addEventListener("click", function() {
-    console.log("回到上一句 clicked");
-    // Send message to content script to go to previous sentence
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-      if (tabs[0] && tabs[0].url && tabs[0].url.includes("youtube.com/watch")) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: "goToPreviousSentence" });
-      } else {
-        statusDiv.textContent = "请在YouTube视频页面使用此功能";
-      }
-    });
-  });
-
-  btnVocab.addEventListener("click", function() {
-    console.log("显示生词 clicked");
-    // Send message to content script to show vocabulary
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-      if (tabs[0] && tabs[0].url && tabs[0].url.includes("youtube.com/watch")) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: "showVocabulary" });
-      } else {
-        statusDiv.textContent = "请在YouTube视频页面使用此功能";
-      }
-    });
-  });
-
-  btnSpeed.addEventListener("click", function() {
-    console.log("选择倍速 clicked");
-    // Send message to content script to select playback speed
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-      if (tabs[0] && tabs[0].url && tabs[0].url.includes("youtube.com/watch")) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: "selectPlaybackSpeed" });
-      } else {
-        statusDiv.textContent = "请在YouTube视频页面使用此功能";
-      }
-    });
-  });
 });
