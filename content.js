@@ -350,6 +350,7 @@ function createSubtitleElements() {
   subtitleContainer.style.bottom = "10%";
   subtitleContainer.style.textAlign = "center";
 
+  // 原文
   subtitleText = document.createElement("div");
   subtitleText.id = "youtube-gemini-subtitles-text";
   subtitleText.style.fontSize = "22px";
@@ -360,6 +361,18 @@ function createSubtitleElements() {
   subtitleText.style.backgroundColor = "rgba(0,0,0,0.4)";
   subtitleText.style.borderRadius = "8px";
 
+  // 翻译
+  subtitleTranslation = document.createElement("div");
+  subtitleTranslation.className = "subtitle-translation";
+  subtitleTranslation.style.fontSize = "22px";
+  subtitleTranslation.style.color = "black";
+  subtitleTranslation.style.padding = "6px 12px";
+  subtitleTranslation.style.display = "inline-block";
+  subtitleTranslation.style.backgroundColor = "white";
+  subtitleTranslation.style.borderRadius = "8px";
+  subtitleTranslation.style.marginTop = "4px";
+  
+  subtitleContainer.appendChild(subtitleTranslation);
   subtitleContainer.appendChild(subtitleText);
 
   if (videoContainer) {
@@ -398,7 +411,7 @@ function stopSubtitleDisplay() {
 }
 
 function updateSubtitles() {
-  if (!videoPlayer || !subtitleText || !subtitleContainer || videoPlayer.paused)
+  if (!videoPlayer || !subtitleText || !subtitleContainer || videoPlayer.paused || !subtitleTranslation)
     return;
 
   const currentTime = videoPlayer.currentTime * 1000;
@@ -407,9 +420,8 @@ function updateSubtitles() {
   );
 
   if (subtitle) {
-    if (subtitleText.textContent !== subtitle.text) {
-      subtitleText.textContent = subtitle.text;
-    }
+    subtitleText.textContent = subtitle.text; 
+    subtitleTranslation.textContent = ""; 
     subtitleContainer.style.display = "block";
   } else {
     hideCurrentSubtitle();
@@ -419,6 +431,7 @@ function updateSubtitles() {
 function hideCurrentSubtitle() {
   if (subtitleContainer) subtitleContainer.style.display = "none";
   if (subtitleText) subtitleText.textContent = "";
+  if (subtitleTranslation) subtitleTranslation.textContent = "";
 }
 
 function clearSubtitles() {
@@ -428,17 +441,21 @@ function clearSubtitles() {
   console.log("Subtitles cleared.");
 }
 
-function updateSubtitleText(container, text) {
+function updateSubtitleText(container, text, append = false) {
   if (!container) return;
   container.style.display = "block";
-  const textEl = container.querySelector("#youtube-gemini-subtitles-text");
-  if (textEl) textEl.textContent = text;
+
+  const translationEl = container.querySelector(".subtitle-translation");
+  if (!translationEl) return;
+
+  // append=true 表示更新翻译层
+  if (append) {translationEl.textContent = text;}
 }
 
-function requestSubtitles(container) {
-  if (!currentSubtitles.length) return;
-  updateSubtitles();
-}
+// function requestSubtitles(container) {
+//   if (!currentSubtitles.length) return;
+//   updateSubtitles();
+// }
 
 // 视频暂停时获当前句子可能的生词
 function handleVideoPause() {
@@ -573,7 +590,7 @@ function handleTranslation(){
 
         if (response && response.success) {
           const translatedText = response.translation?.trim() || "Translation parsing failed";
-          updateSubtitleText(subtitleContainer, translatedText);
+          updateSubtitleText(subtitleContainer, translatedText, true);
           console.log("Translation completed:", translatedText);
         } else {
           const errorMessage = response?.error === "401" ? "API Key invalid" : "Fail to translate";
@@ -583,7 +600,6 @@ function handleTranslation(){
       }
     );
   });
-
 }
 
 function handleShowVocabulary() {

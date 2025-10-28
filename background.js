@@ -97,6 +97,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep message channel open for async response
   }
 
+  // Generate example sentence handler
+  if (message.action === "generateExampleSentence") {
+    chrome.storage.local.get(["geminiApiKey"], async (result) => {
+      if (!result.geminiApiKey) {
+        sendResponse({ success: false, error: "API key not found" });
+        return;
+      }
+      const sentenceResult = await generateExampleSentence(message.text, result.geminiApiKey);
+      sendResponse(sentenceResult);
+    });
+    return true; // Keep message channel open for async response
+  }
+
   if (message.action === "fetchSubtitles") {
     const { videoUrl, apiKey } = message;
     const tabId = sender.tab?.id;
@@ -436,3 +449,73 @@ async function extractVocabularyWithGemini(text, apiKey) {
       };
     }
   }
+
+// generate ai example for new words
+async function generateExampleSentence(text, apiKey) {
+  try {
+    // Debug logging
+    console.log(`Starting generating sentence for: ${text}`);
+    // Get stored language and level preferences
+    const result = await chrome.storage.local.get(["tarlang", "level"]);
+    const sourceLanguage = result.tarlang || "french"; // Default to french if not set
+    const level = result.level || "intermediate"; // Default to intermediate if not set
+    // Create prompts
+    const prompt = `
+      Please generate one short example sentence using the word "${text}" in ${sourceLanguage}.
+      Requirements:
+        - Provide only the example sentence
+        - No explanations or alternatives
+        - Adjust example sentence to ${level} level learners`;
+
+    // Validate API key
+    if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10) {
+      throw new Error("Invalid API key format");
+    }
+
+    const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + apiKey;
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          topP: 0.8
+        }
+      })
+    });
+
+    console.log("API Response Status:", response.status);
+
+    if (response.status === 401) {
+      throw new Error("Invalid API key");
+    }
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("API Error Details:", errorData);
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      throw new Error("Invalid response format");
+    }
+
+    return {
+      success: true,
+      sentence: data.candidates[0].content.parts[0].text
+    };
+  } catch (error) {
+    console.error('Generation error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
