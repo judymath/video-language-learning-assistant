@@ -9,6 +9,8 @@ let currentUrl = window.location.href;
 let initAttempts = 0;
 let vocabPopup = null;
 let loopInterval = null;
+let isLoop = false;
+let isPaused = false;
 const MAX_INIT_ATTEMPTS = 10;
 
 // Add storage helper functions
@@ -229,11 +231,13 @@ function createFloatingPanel() {
     const statusEl = videoStatus;
 
     videoPlayer.addEventListener("play", () => {
+      isPaused = false;
       statusEl.textContent = "Playing";
       statusEl.style.color = "#00e676";
     });
 
     videoPlayer.addEventListener("pause", () => {
+      isPaused = true;
       statusEl.textContent = "Paused";
       statusEl.style.color = "#ff5252";
     });
@@ -729,9 +733,9 @@ function handleShowVocabulary() {
               vocabPopup.querySelectorAll('.add-word-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                   e.stopPropagation(); // Prevent popup from closing
-                  // const word = btn.dataset.word;
-                  // const translation = btn.dataset.translation;
-                  // await addToSavedWords(word, translation);
+                  const word = btn.dataset.word;
+                  const translation = btn.dataset.translation;
+                  await addToSavedWords(word, translation);
                   btn.outerHTML = 
                   `<button
                     style = "background: transparent; border: 1px solid #FDD835; color: #FDD835;
@@ -817,6 +821,23 @@ function handleShowWordNotebook() {
         btn.addEventListener("click", (e) => {
           const word = e.target.dataset.word;
           console.log(`Generating AI example for: ${word}`);
+
+          // 获取当前单词卡片容器
+          const cardEl = e.target.closest("div[style*='background']");
+
+          // 如果已经有旧的例句区域，清除或更新
+          let resultEl = cardEl.querySelector(".ai-sentence-result");
+          if (!resultEl) {
+            resultEl = document.createElement("div");
+            resultEl.className = "ai-sentence-result";
+            resultEl.style.marginTop = "6px";
+            resultEl.style.fontSize = "12px";
+            resultEl.style.color = "#ccc";
+            resultEl.textContent = "Generating example...";
+            cardEl.appendChild(resultEl);
+          } else {
+            resultEl.textContent = "Generating example...";
+          }
   
           chrome.storage.local.get(['geminiApiKey'], function(result) {
             if (!result.geminiApiKey) {
@@ -834,14 +855,19 @@ function handleShowWordNotebook() {
               (response) => {
                 if (chrome.runtime.lastError) {
                   console.error("Generating sentense request failed:", chrome.runtime.lastError);
+                  resultEl.textContent = "AI sentence request failed. Try again.";
                   return;
                 }
                 if (response && response.success) {
                   const generatedSentence = response.sentence?.trim() || "Sentence parsing failed";
                   console.log("Generation completed:", generatedSentence);
+                  // 更新显示结果
+                  resultEl.innerHTML = `<span style="color:#00c896;">Example:</span> ${generatedSentence}`;
+          
                 } else {
                   const errorMessage = response?.error === "401" ? "API Key invalid" : "Fail to generate";
                   console.error("Generation failed:", response?.error);
+                  resultEl.textContent = `${errorMessage}`;
                 }
               }
             );
@@ -854,6 +880,7 @@ function handleShowWordNotebook() {
 
 function handleSelectPlaybackSpeed() {
   console.log("Selecting playback speed for current sentence");
+
   if (!videoPlayer || !currentSubtitles.length) {
     console.log("No video player or subtitles available");
     return;
@@ -873,13 +900,22 @@ function handleSelectPlaybackSpeed() {
     return;
   }
 
-  if (loopInterval) {
+   // 优先判断是否正在循环中（允许播放状态下停止）
+   if (isLoop && loopInterval) {
     clearInterval(loopInterval);
     loopInterval = null;
+    isLoop = false;
+
     videoPlayer.playbackRate = 1.0;
-    btnLoop.textContent = "Single Sentence Loop";
     videoPlayer.play();
+
+    btnLoop.textContent = "Single Sentence Loop";
     console.log("Stopped single sentence loop");
+    return;
+  }
+
+  if (!isPaused) {
+    alert("Please stop the video first to activate this function.");
     return;
   }
 
@@ -887,6 +923,8 @@ function handleSelectPlaybackSpeed() {
   videoPlayer.playbackRate = speed;
   videoPlayer.currentTime = currentSubtitle.startTime / 1000;
   videoPlayer.play();
+
+  isLoop = true;
 
   loopInterval = setInterval(() => {
     if (videoPlayer.currentTime * 1000 >= currentSubtitle.endTime) {
