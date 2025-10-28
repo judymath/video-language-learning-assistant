@@ -367,7 +367,8 @@ function createSubtitleElements() {
   subtitleTranslation.style.fontSize = "22px";
   subtitleTranslation.style.color = "black";
   subtitleTranslation.style.padding = "6px 12px";
-  subtitleTranslation.style.display = "inline-block";
+  // subtitleTranslation.style.display = "inline-block";
+  subtitleTranslation.style.display = "none";
   subtitleTranslation.style.backgroundColor = "white";
   subtitleTranslation.style.borderRadius = "8px";
   subtitleTranslation.style.marginTop = "4px";
@@ -420,8 +421,11 @@ function updateSubtitles() {
   );
 
   if (subtitle) {
-    subtitleText.textContent = subtitle.text; 
-    subtitleTranslation.textContent = ""; 
+    subtitleText.textContent = subtitle.text;
+    subtitleTranslation.textContent = "";
+
+    // 如果没有翻译，隐藏翻译层
+    subtitleTranslation.style.display = "none";
     subtitleContainer.style.display = "block";
   } else {
     hideCurrentSubtitle();
@@ -448,14 +452,15 @@ function updateSubtitleText(container, text, append = false) {
   const translationEl = container.querySelector(".subtitle-translation");
   if (!translationEl) return;
 
-  // append=true 表示更新翻译层
-  if (append) {translationEl.textContent = text;}
+  // append=true 表示更新翻译层，且有内容需要显示时
+  if (append && text) {
+    translationEl.textContent = text;
+    translationEl.style.display = "inline-block"; // 有内容时显示
+  } else {
+    translationEl.textContent = "";
+    translationEl.style.display = "none"; // 无内容时隐藏
+  }
 }
-
-// function requestSubtitles(container) {
-//   if (!currentSubtitles.length) return;
-//   updateSubtitles();
-// }
 
 // 视频暂停时获当前句子可能的生词
 function handleVideoPause() {
