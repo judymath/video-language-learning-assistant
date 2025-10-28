@@ -294,7 +294,26 @@ async function translateWithGemini(text, apiKey) {
     try {
       // Debug logging
       console.log("Starting translation request...");
-      
+      // Get stored language and level preferences
+      const result = await chrome.storage.local.get(["tarlang", "level"]);
+      const sourceLanguage = result.tarlang || "french"; // Default to french if not set
+      const level = result.level || "intermediate"; // Default to intermediate if not set
+      // Create source language-specific prompts
+      const sourceLanguagePrompts = {
+        german: "Please translate the following German text to English",
+        portuguese: "Please translate the following Portuguese text to English",
+        spanish: "Please translate the following Spanish text to English",
+        french: "Please translate the following French text to English"
+      };
+
+      const prompt = `${sourceLanguagePrompts[sourceLanguage] || sourceLanguagePrompts.french}
+        Difficulty level: ${level}
+        Requirements:
+        - Provide only the English translation
+        - No explanations or alternatives
+        - Adjust translation to ${level} level learners
+        
+        Original text: "${text}"`;
       // Validate API key
       if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10) {
         throw new Error("Invalid API key format");
@@ -309,9 +328,7 @@ async function translateWithGemini(text, apiKey) {
         },
         body: JSON.stringify({
           contents: [{
-            parts: [{
-              text: `请将以下英文翻译成中文，只需要给出翻译结果，不要解释或提供选项：\n\n "${text}"`
-            }]
+            parts: [{ text: prompt }]
           }],
           generationConfig: {
             temperature: 0.1,
@@ -353,6 +370,28 @@ async function translateWithGemini(text, apiKey) {
   // Add new function for vocabulary extraction
 async function extractVocabularyWithGemini(text, apiKey) {
     try {
+      const result = await chrome.storage.local.get(["tarlang", "level"]);
+      const sourceLanguage = result.tarlang || "french";
+      const level = result.level || "intermediate";
+
+      // Create source language-specific prompts
+      const sourceLanguagePrompts = {
+        german: "Extract key words from German and translate to English",
+        portuguese: "Extract key words from Portuguese and translate to English",
+        spanish: "Extract key words from Spanish and translate to English",
+        french: "Extract key words from French and translate to English"
+      };
+
+      const prompt = `${sourceLanguagePrompts[sourceLanguage] || sourceLanguagePrompts.chinese}
+        Requirements:
+        - Select words appropriate for ${level} level
+        - One word/phrase per line
+        - Use format: "original - English translation"
+        - No numbering or explanations
+        - No blank lines
+        - Select 3 important words for ${level} level learners
+        
+        Original text: "${text}"`;
       const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + apiKey;
       
       const response = await fetch(endpoint, {
@@ -361,18 +400,9 @@ async function extractVocabularyWithGemini(text, apiKey) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: `Extract 3 key words or phrases from this English sentence and provide Chinese translations.
-          Format requirements:
-          - One word/phrase per line
-          - Use exactly this format: "word - 翻译"
-          - No extra explanations or numbering
-          - No blank lines between entries
-          
-          Input sentence: "${text}"`
-              }]
-            }],
+          contents: [{
+            parts: [{ text: prompt }]
+          }],
           generationConfig: {
             temperature: 0.1,
             topP: 0.8,
