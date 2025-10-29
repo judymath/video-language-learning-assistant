@@ -33,7 +33,7 @@ Install the extension, choose your language and CEFR level, and (optionally) act
 
 - **Chrome (Manifest V3)** with permission to run on `youtube.com`.
 - Optional: **Chrome’s Built-in AI / Gemini Nano** (if available on your device).
-- Optional fallback: **Gemini API key** (set in Options).
+- Optional fallback: Go to https://aistudio.google.com to create the **Gemini API key** (set in Options).
 
 ---
 
