@@ -84,8 +84,6 @@ Contains styles for the subtitle display on YouTube videos.
 
 Provides documentation for the project.
 
-<<<<<<< HEAD
----
 
 ## Usage
 
@@ -105,19 +103,12 @@ Provides documentation for the project.
 - No analytics and no third-party trackers.
 
 ---
-=======
->>>>>>> 263c1e7 (copy from yt)
 
 ## Contributing
 
 Feel free to fork this repository and submit pull requests for improvements or new features.
 
-<<<<<<< HEAD
 
----
-
-=======
->>>>>>> 263c1e7 (copy from yt)
 ## License
 
 This project is licensed under the MIT License. See the LICENSE file for details.
