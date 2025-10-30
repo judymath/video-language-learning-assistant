@@ -96,7 +96,7 @@ Provides documentation for the project.
 
 ## Proposed (Not Yet Implemented)
 
-<ol start="2">
+<ol start="1">
 
 <li><strong>Sentence looping only available while paused</strong><br/>
 Proposal: allow starting/stopping loops during playback; auto-detect sentence boundaries without requiring a manual pause; add a hotkey toggle for on-the-fly looping.</li>
