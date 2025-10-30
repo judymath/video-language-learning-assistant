@@ -1,7 +1,7 @@
 # LinguaLoop — Chrome Extension 
 
 **Stop skimming. Start looping.** LinguaLoop turns YouTube into a language-immersion workspace—tailored for **intermediate learners**.  
-Install the extension, choose your language and CEFR level, and (optionally) activate on-device AI with **Chrome’s Built-in AI / Gemini Nano** or your **Gemini API key**.
+Install the extension, choose your language and CEFR level, and activate on-device AI with **Chrome’s Built-in AI / Gemini Nano** or your **Gemini API key**.
 
 > **Privacy first:** When on-device AI is available/enabled, your learning data (what you save, how you study) stays on your device.
 
@@ -20,11 +20,10 @@ Install the extension, choose your language and CEFR level, and (optionally) act
 
 ## Features
 
-- **One-click sentence looping** with adjustable playback speed.
+- **One-click sentence looping** with adjustable playback speed when video is paused.
 - **Movable vocabulary pop-up**: translation + key-word highlighting suited to your level.
 - **Built-in translation** and **on-device keyword selection** (AI).
 - **One-click save** to a private, in-browser **Vocabulary Book** (review mode generates fresh example sentences).
-- **Keyboard shortcuts** for flow (Prev sentence / Repeat / Speed / Add word).
 - **Fixed-size UI** (no responsive/screen adaptation), matching the provided hi-fi mocks.
 
 ---
@@ -32,8 +31,8 @@ Install the extension, choose your language and CEFR level, and (optionally) act
 ## Requirements
 
 - **Chrome (Manifest V3)** with permission to run on `youtube.com`.
-- Optional: **Chrome’s Built-in AI / Gemini Nano** (if available on your device).
-- Optional fallback: Go to https://aistudio.google.com to create the **Gemini API key** (set in Options).
+- **Chrome’s Built-in AI / Gemini Nano** (if available on your device).
+- **Chrome’s Gemini API key application** Go to https://aistudio.google.com to create the **Gemini API key** (set in Options).
 
 ---
 
@@ -49,7 +48,7 @@ Install the extension, choose your language and CEFR level, and (optionally) act
 
 1. Click the toolbar icon → **Options**.
 2. Set **Target language** and **CEFR level**.
-3. (Optional) Paste your **Gemini API key**, or toggle **On-device AI only**.
+3. Paste your **Gemini API key**.
 4. Grant **host permissions** when prompted (YouTube). If you missed it, open `chrome://extensions` → LinguaLoop → **Site access**.
 
 ---
@@ -92,6 +91,23 @@ Provides documentation for the project.
 3. Use the vocabulary **pop-up** to read translation and highlighted key words for your level.
 4. Press **A** to save a word/phrase to the **Vocabulary Book**.
 5. Review saved items; AI generates **fresh example sentences** tailored to you.
+
+---
+
+## Proposed (Not Yet Implemented)
+
+<ol start="2">
+
+<li><strong>Sentence looping only available while paused</strong><br/>
+Proposal: allow starting/stopping loops during playback; auto-detect sentence boundaries without requiring a manual pause; add a hotkey toggle for on-the-fly looping.</li>
+
+<li><strong>Vocabulary pop-up size</strong><br/>
+Proposal: make the pop-up resizable (drag handle with remembered size/position) and add a quick “compact/comfortable” density toggle; support larger fonts for accessibility.</li>
+
+<li><strong>Manual “Generate” per video is cumbersome</strong><br/>
+Proposal: auto-trigger “Generate” when a new YouTube video is detected, with a global “Always generate on new videos” toggle in Options; include safeguards for rate limits and a per-tab opt-out.</li>
+
+</ol>
 
 ---
 
