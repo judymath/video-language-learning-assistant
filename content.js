@@ -243,13 +243,13 @@ function createFloatingPanel() {
     });
   }
 
-  // 关闭按钮事件绑定
+  // Close button event binding
   panel.querySelector("#close-panel").addEventListener("click", (e) => {
-      e.stopPropagation(); // 防止触发拖拽
+      e.stopPropagation(); // Preventing dragging
       document.body.removeChild(panel);
   });
 
-  // 按钮事件绑定
+  // Button event binding
   panel.querySelector("#btn-speed").addEventListener("click", () => {
       handleSelectPlaybackSpeed();
   });
@@ -350,7 +350,7 @@ function createSubtitleElements() {
   subtitleContainer.style.bottom = "10%";
   subtitleContainer.style.textAlign = "center";
 
-  // 原文
+  // original subtitle
   subtitleText = document.createElement("div");
   subtitleText.id = "youtube-gemini-subtitles-text";
   subtitleText.style.fontSize = "22px";
@@ -361,7 +361,7 @@ function createSubtitleElements() {
   subtitleText.style.backgroundColor = "rgba(0,0,0,0.4)";
   subtitleText.style.borderRadius = "8px";
 
-  // 翻译
+  // translation subtitle
   subtitleTranslation = document.createElement("div");
   subtitleTranslation.className = "subtitle-translation";
   subtitleTranslation.style.fontSize = "22px";
@@ -424,7 +424,7 @@ function updateSubtitles() {
     subtitleText.textContent = subtitle.text;
     subtitleTranslation.textContent = "";
 
-    // 如果没有翻译，隐藏翻译层
+    // if there's no translation, hide this subtitle container
     subtitleTranslation.style.display = "none";
     subtitleContainer.style.display = "block";
   } else {
@@ -452,17 +452,17 @@ function updateSubtitleText(container, text, append = false) {
   const translationEl = container.querySelector(".subtitle-translation");
   if (!translationEl) return;
 
-  // append=true 表示更新翻译层，且有内容需要显示时
+  // append=true show translation container
   if (append && text) {
     translationEl.textContent = text;
-    translationEl.style.display = "inline-block"; // 有内容时显示
+    translationEl.style.display = "inline-block"; 
   } else {
     translationEl.textContent = "";
-    translationEl.style.display = "none"; // 无内容时隐藏
+    translationEl.style.display = "none"; // hidden, when nothing to show
   }
 }
 
-// 视频暂停时获当前句子可能的生词
+// Get possible new words for the current sentence when the video is paused.
 function handleVideoPause() {
   if (!videoPlayer) return;
   const currentTimestamp = videoPlayer.currentTime * 1000;
@@ -624,7 +624,7 @@ async function handleTranslation() {
       
       Text: "${currentSubtitle.text}"`;
 
-    const result = await session.prompt(prompt, { 
+    const result = await session.translateText(prompt, { 
       language: 'en',
       safetySettings: [
         {
@@ -648,56 +648,6 @@ async function handleTranslation() {
     session?.destroy?.();
   }
 }
-
-// function handleTranslation(){
-//   console.log("translating subtitle");
-//   if (!videoPlayer || !currentSubtitles.length) {
-//     console.log("No video player or subtitles available");
-//     return;
-//   }
-
-//   const currentTime = videoPlayer.currentTime * 1000;
-//   const currentSubtitle = currentSubtitles.find(
-//     (s) => currentTime >= s.startTime && currentTime <= s.endTime
-//   );
-
-//   console.log(`try to translate: ${currentSubtitle.text}`);
-
-//   chrome.storage.local.get(['geminiApiKey'], function(result) {
-//     if (!result.geminiApiKey) {
-//       updateSubtitleText(subtitleContainer, "Please set API Key first.");
-//       return;
-//     }
-
-//     chrome.runtime.sendMessage(
-//       {
-//         action: "translateWithGemini",
-//         text: currentSubtitle.text,
-//         videoId: currentVideoId,
-//         apiKey: result.geminiApiKey
-//       },
-//       (response) => {
-//         if (chrome.runtime.lastError) {
-//           console.error("Translation request failed:", chrome.runtime.lastError);
-//           updateSubtitleText(subtitleContainer, "Fail to connect translation.");
-//           return;
-//         }
-
-//         if (response && response.success) {
-//           const translatedText = response.translation?.trim() || "Translation parsing failed";
-//           updateSubtitleText(subtitleContainer, translatedText, true);
-//           console.log("Translation completed:", translatedText);
-//         } else {
-//           const errorMessage = response?.error === "401" ? "API Key invalid" : "Fail to translate";
-//           console.error("Translation failed:", response?.error);
-//           updateSubtitleText(subtitleContainer, errorMessage);
-//         }
-//       }
-//     );
-//   });
-// }
-
-
 
 async function handleShowVocabulary() {
   console.log("Showing vocabulary");
@@ -843,297 +793,6 @@ async function handleShowVocabulary() {
   }
 }
 
-// function handleShowVocabulary() {
-//     console.log("Showing vocabulary");
-//     if (!videoPlayer || !currentSubtitles.length) {
-//       console.log("No video player or subtitles available");
-//       return;
-//     }
-  
-//     const currentTime = videoPlayer.currentTime * 1000;
-//     const currentSubtitle = currentSubtitles.find(
-//       (s) => currentTime >= s.startTime && currentTime <= s.endTime
-//     );
-  
-//     if (currentSubtitle) {
-//       // First verify API key exists
-//       chrome.storage.local.get(['geminiApiKey'], function(result) {
-//         if (!result.geminiApiKey) {
-//           showMessage("Please set API key first.");
-//           return;
-//         }
-  
-//         // Create loading popup
-//         if (vocabPopup) vocabPopup.remove(); // 如果已存在旧popup先清除
-//         vocabPopup = document.createElement("div");
-//         vocabPopup.id = "vocabulary-popup";
-//         vocabPopup.style.position = "fixed";
-//         vocabPopup.style.top = "50%";
-//         vocabPopup.style.left = "50%";
-//         vocabPopup.style.transform = "translate(-50%, -50%)";
-//         vocabPopup.style.background = "rgba(0,0,0,0.9)";
-//         vocabPopup.style.color = "white";
-//         vocabPopup.style.padding = "10px 14px";
-//         vocabPopup.style.borderRadius = "10px";
-//         vocabPopup.style.zIndex = "100000";
-//         vocabPopup.style.maxWidth = "400px";
-//         vocabPopup.style.textAlign = "center";
-//         vocabPopup.style.cursor = "move";
-//         vocabPopup.style.userSelect = "none";
-//         vocabPopup.innerHTML = `
-//           <h3 style="margin: 0 0 15px 0;">Analyzing...</h3>
-//           <p style="margin: 0 0 15px 0; color: #ccc;">Please wait</p>
-//         `;
-        
-//         document.body.appendChild(vocabPopup);
-//         dragFloatingWindow(vocabPopup)
-  
-//         // Request vocabulary extraction
-//         chrome.runtime.sendMessage(
-//           {
-//             action: "extractVocabulary",
-//             text: currentSubtitle.text
-//           },
-//           async function(response) {
-//             if (chrome.runtime.lastError) {
-//               vocabPopup.innerHTML = `
-//                 <h3 style="margin: 0 0 15px 0;">Failed to analyze</h3>
-//                 <p style="margin: 0 0 10px 0; color: #ff6b6b;">Please try later</p>
-//               `;
-//               return;
-//             }
-
-//             // Add storage helper functions
-//             async function addToSavedWords(word, translation) {
-//               const result = await chrome.storage.local.get(['savedWords']);
-//               const savedWords = result.savedWords || {};
-//               savedWords[word.toLowerCase()] = translation;
-//               await chrome.storage.local.set({ savedWords });
-//             }
-
-//             async function getSavedWords() {
-//               const result = await chrome.storage.local.get(['savedWords']);
-//               return result.savedWords || {};
-//             }
-
-//             // Update vocabulary display with add buttons and saved status
-//             if (response?.success) {
-//               // Get saved words first
-//               const savedWords = await getSavedWords();
-
-//               // Extract words and create highlighted text
-//               const vocabWords = response.vocabulary
-//                 .split('\n')
-//                 .filter(line => line.trim())
-//                 .map(line => line.split('-')[0].trim());
-
-//               // Highlight text with different colors for saved words
-//               let highlightedText = currentSubtitle.text;
-//               vocabWords.forEach(word => {
-//                 const regex = new RegExp(`\\b${word}\\b`, 'gi');
-//                 const isSaved = savedWords[word.toLowerCase()];
-//                 const highlightColor = isSaved ?
-//                   'rgba(255, 235, 59, 0.3)' : // yellow for saved
-//                   'rgba(76, 175, 80, 0.3)'; // green for new
-//                 const borderColor = isSaved ? '#FDD835' : '#4CAF50';
-
-//                 highlightedText = highlightedText.replace(regex, `<span style="
-//                   background-color: ${highlightColor};
-//                   border-bottom: 1px solid ${borderColor};
-//                   padding: 0 2px;
-//                 ">${word}</span>`);
-//               });
-
-//               // Format vocabulary pairs with add buttons
-//               const vocabLines = response.vocabulary
-//                 .split('\n')
-//                 .filter(line => line.trim())
-//                 .map(line => {
-//                   const [word, translation] = line.split('-').map(s => s.trim());
-//                   const isSaved = savedWords[word.toLowerCase()];
-
-//                   return `
-//                     <div class="vocab-pair" style="
-//                       display: grid;
-//                       grid-template-columns: 1fr auto 1fr auto;
-//                       gap: 10px;
-//                       padding: 5px 0;
-//                       align-items: center;
-//                     ">
-//                       <span style="color: #fff;">${word}</span>
-//                       <span style="color: #666;">-</span>
-//                       <span style="color: #4CAF50;">${translation}</span>
-//                       ${isSaved ?
-//                       `<button
-//                         style="background: transparent; border: 1px solid #FDD835; color: #FDD835;
-//                         padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-//                         Saved</button>` : 
-//                       `<button 
-//                           class="add-word-btn" 
-//                           style="background: transparent; border: 1px solid #4CAF50; color: #4CAF50;
-//                           padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;"
-//                           data-word="${word}"
-//                           data-translation="${translation}"
-//                         >Add</button>`}
-//                     </div>
-//                   `;
-//                 })
-//                 .join('');
-
-//               vocabPopup.innerHTML = `
-//                 <div style="margin: 15px 0;">
-//                   ${vocabLines}
-//                 </div>
-//               `;
-
-//               // Add click handlers for add buttons
-//               vocabPopup.querySelectorAll('.add-word-btn').forEach(btn => {
-//                 btn.addEventListener('click', async (e) => {
-//                   e.stopPropagation(); // Prevent popup from closing
-//                   const word = btn.dataset.word;
-//                   const translation = btn.dataset.translation;
-//                   await addToSavedWords(word, translation);
-//                   btn.outerHTML = 
-//                   `<button
-//                     style = "background: transparent; border: 1px solid #FDD835; color: #FDD835;
-//                     padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">
-//                     Saved</button>`
-//                 });
-//               });
-//             } else {
-//               vocabPopup.innerHTML = `
-//                 <h3 style="margin: 0 0 15px 0;">Fail to analyze</h3>
-//                 <p style="margin: 0 0 10px 0; color: #ff6b6b;">${response?.error || 'Unkown fault'}</p>
-//               `;
-//             }
-//           }
-//         );
-        
-//         // Close popup when clicked（拖拽后不关闭）
-//         vocabPopup.addEventListener("click", (e) => {
-//           if (!didDrag) {
-//             document.body.removeChild(vocabPopup);
-//           }
-//         });
-        
-//       });
-//     } else {
-//       console.log("No current subtitle found");
-//     }
-//   }
-
-
-// async function handleShowWordNotebook() {
-//   console.log("showing all saved word");
-//   const container = document.getElementById("notebook-container");
-//   if (!container) return;
-
-//   if (container.style.display === "none") {
-//     container.style.display = "block";
-//   } else {
-//     container.style.display = "none";
-//     return;
-//   }
-
-//   chrome.storage.local.get(["savedWords"], (result) => {
-//     const savedWords = result.savedWords || {};
-
-//     // 空的情况
-//     if (Object.keys(savedWords).length === 0) {
-//       container.innerHTML = `<div style="text-align:center; color:#bbb;">No saved words yet.</div>`;
-//       return;
-//     }
-
-//     // 生成 HTML
-//     container.innerHTML = Object.entries(savedWords)
-//       .map(
-//         ([word, meaning]) => `
-//         <div style="
-//           background: rgba(255,255,255,0.08); border-radius:6px; padding:6px 8px;
-//           margin-bottom:6px; text-align:left;">
-//           <div style="
-//             display: grid;
-//             grid-template-columns: 1fr auto;
-//             align-items: center;
-//             column-gap: 10px;
-//           ">
-//             <div style="display: flex; flex-direction: column;">
-//               <div style="color:#ffcc00; font-weight:bold; font-size:14px;">${word}</div>
-//               <div style="color:#ddd; font-size:12px; margin-top:4px;">${meaning}</div>
-//             </div>
-//             <button 
-//               class="ai-example-btn"
-//               data-word="${word}"
-//               style="
-//                 background:#0078ff; color:#fff; border:none; border-radius:6px; 
-//                 font-size:11px; padding:8px 10px; cursor:pointer; height:100%;
-//               ">AI Sentence</button>
-//           </div>
-//         </div>
-//       `
-//       )
-//       .join("");
-
-//       document.querySelectorAll(".ai-example-btn").forEach((btn) => {
-//         btn.addEventListener("click", (e) => {
-//           const word = e.target.dataset.word;
-//           console.log(`Generating AI example for: ${word}`);
-
-//           // 获取当前单词卡片容器
-//           const cardEl = e.target.closest("div[style*='background']");
-
-//           // 如果已经有旧的例句区域，清除或更新
-//           let resultEl = cardEl.querySelector(".ai-sentence-result");
-//           if (!resultEl) {
-//             resultEl = document.createElement("div");
-//             resultEl.className = "ai-sentence-result";
-//             resultEl.style.marginTop = "6px";
-//             resultEl.style.fontSize = "12px";
-//             resultEl.style.color = "#ccc";
-//             resultEl.textContent = "Generating example...";
-//             cardEl.appendChild(resultEl);
-//           } else {
-//             resultEl.textContent = "Generating example...";
-//           }
-  
-//           // chrome.storage.local.get(['geminiApiKey'], function(result) {
-//           //   if (!result.geminiApiKey) {
-//           //     updateSubtitleText(subtitleContainer, "Please set API Key first.");
-//           //     return;
-//           //   }
-
-//           //   chrome.runtime.sendMessage(
-//           //     {
-//               //   action: "generateExampleSentence",
-//               //   text: word,
-//               //   videoId: currentVideoId,
-//               //   apiKey: result.geminiApiKey
-//               // },
-//               // (response) => {
-//               //   if (chrome.runtime.lastError) {
-//               //     console.error("Generating sentense request failed:", chrome.runtime.lastError);
-//               //     resultEl.textContent = "AI sentence request failed. Try again.";
-//               //     return;
-//           //       }
-//           //       if (response && response.success) {
-//           //         const generatedSentence = response.sentence?.trim() || "Sentence parsing failed";
-//           //         console.log("Generation completed:", generatedSentence);
-//           //         // 更新显示结果
-//           //         resultEl.innerHTML = `<span style="color:#00c896;">Example:</span> ${generatedSentence}`;
-          
-//           //       } else {
-//           //         const errorMessage = response?.error === "401" ? "API Key invalid" : "Fail to generate";
-//           //         console.error("Generation failed:", response?.error);
-//           //         resultEl.textContent = `${errorMessage}`;
-//           //       }
-//           //     }
-//           //   );
-//           // });  
-//         });
-//       });
-//   });
-// }
-
 async function handleShowWordNotebook() {
   console.log("showing all saved word");
   const container = document.getElementById("notebook-container");
@@ -1276,7 +935,7 @@ function handleSelectPlaybackSpeed() {
     return;
   }
 
-   // 优先判断是否正在循环中（允许播放状态下停止）
+   // First, determine if the video is currently in a loop (stop if playback is allowed).
    if (isLoop && loopInterval) {
     clearInterval(loopInterval);
     loopInterval = null;
@@ -1295,7 +954,7 @@ function handleSelectPlaybackSpeed() {
     return;
   }
 
-  // 开始循环
+  // begin loop
   videoPlayer.playbackRate = speed;
   videoPlayer.currentTime = currentSubtitle.startTime / 1000;
   videoPlayer.play();
@@ -1308,6 +967,6 @@ function handleSelectPlaybackSpeed() {
     }
   }, 50);
 
-  btnLoop.textContent = "Continue Playing"; // 更新按钮文字
+  btnLoop.textContent = "Continue Playing"; // Update button text
   console.log(`Started single sentence loop at ${speed}x speed`);
 }
