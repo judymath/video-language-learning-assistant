@@ -50,6 +50,7 @@ Install the extension, choose your language and CEFR level, and activate on-devi
 2. Set **Target language** and **CEFR level**.
 3. Paste your **Gemini API key**.
 4. Grant **host permissions** when prompted (YouTube). If you missed it, open `chrome://extensions` → LinguaLoop → **Site access**.
+5. Press the red "Generate" button to generate subtitles.
 
 ---
 
