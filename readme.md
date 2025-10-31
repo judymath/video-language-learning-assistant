@@ -1,7 +1,7 @@
 # LinguaLoop — Chrome Extension 
 
 **Stop skimming. Start looping.** LinguaLoop turns YouTube into a language-immersion workspace—tailored for **intermediate learners**.  
-Install the extension, choose your language and CEFR level, and (optionally) activate on-device AI with **Chrome’s Built-in AI / Gemini Nano** or your **Gemini API key**.
+Install the extension, choose your language and CEFR level, and activate on-device AI with **Chrome’s Built-in AI / Gemini Nano**(Prompt API) and **Gemini API key**（only for generate subtitles).
 
 > **Privacy first:** When on-device AI is available/enabled, your learning data (what you save, how you study) stays on your device.
 
@@ -24,7 +24,6 @@ Install the extension, choose your language and CEFR level, and (optionally) act
 - **Movable vocabulary pop-up**: translation + key-word highlighting suited to your level.
 - **Built-in translation** and **on-device keyword selection** (AI).
 - **One-click save** to a private, in-browser **Vocabulary Book** (review mode generates fresh example sentences).
-- **Keyboard shortcuts** for flow (Prev sentence / Repeat / Speed / Add word).
 - **Fixed-size UI** (no responsive/screen adaptation), matching the provided hi-fi mocks.
 
 ---
@@ -32,8 +31,8 @@ Install the extension, choose your language and CEFR level, and (optionally) act
 ## Requirements
 
 - **Chrome (Manifest V3)** with permission to run on `youtube.com`.
-- Optional: **Chrome’s Built-in AI / Gemini Nano** (if available on your device).
-- Optional fallback: Go to https://aistudio.google.com to create the **Gemini API key** (set in Options).
+- **Chrome’s Built-in AI / Gemini Nano**.
+- **Apply for Gemini API key** ：Go to https://aistudio.google.com to create the **Gemini API key**.
 
 ---
 
@@ -49,8 +48,9 @@ Install the extension, choose your language and CEFR level, and (optionally) act
 
 1. Click the toolbar icon → **Options**.
 2. Set **Target language** and **CEFR level**.
-3. (Optional) Paste your **Gemini API key**, or toggle **On-device AI only**.
+3. Paste your **Gemini API key**.
 4. Grant **host permissions** when prompted (YouTube). If you missed it, open `chrome://extensions` → LinguaLoop → **Site access**.
+5. Press the red "Generate" button to generate subtitles.
 
 ---
 
@@ -66,7 +66,7 @@ Handles communication with the Gemini API and manages local storage for subtitle
 
 ### `content.js`
 
-Runs on YouTube pages to manage subtitle display. It listens for messages from the background script and popup, loads stored subtitles, and updates the UI.
+Runs on YouTube pages to manage display of interface. It listens for messages from the background script and popup, loads stored subtitles, operate single sentence loop, playback speed adjustment, reverse to previous sentence, save new words to notebook, vocabulary-based sentence generation, and full sentence translation.
 
 ### `popup.html`
 
@@ -104,7 +104,7 @@ Provides documentation for the project.
 
 ---
 
-# Credits and Attributions
+## Credits and Attributions
 
 This project uses code from the following open-source library:
 
