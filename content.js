@@ -584,6 +584,8 @@ async function handleTranslation() {
     });
   });
 
+  if (tarLang=='french') tarLang='fr';
+
   const level = await new Promise((resolve) => {
     chrome.storage.local.get(['level'], (result) => {
       resolve(result.level || 'intermediate');
