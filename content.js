@@ -571,60 +571,81 @@ async function handleTranslation() {
     (s) => currentTime >= s.startTime && currentTime <= s.endTime
   );
 
+  if (!currentSubtitle) {
+    console.log("No subtitle found at current time");
+    return;
+  }
+
   console.log(`try to translate: ${currentSubtitle.text}`);
 
   let session;
   try {
-    if (!('LanguageModel' in window)) {
-      throw new Error('LanguageModel API unavailable');
+    if (!('Translator' in window)) {
+      throw new Error('Translator API unavailable');
     }
 
-    const availability = await LanguageModel.availability();
-    console.log('Gemini Nano:', availability);
+    const translatorCapabilities = await Translator.availability({
+      sourceLanguage: tarLang,
+      targetLanguage: 'en'
+    });
+    console.log('Translator availability:', translatorCapabilities);
 
-    if (availability === 'unavailable') {
-      throw new Error('Gemini Nano unavailable');
+    if (translatorCapabilities !== 'available') {
+      throw new Error('Translator unavailable');
     }
 
-    session = await LanguageModel.create();
-    console.log('translator initial success');
+    session = await Translator.create();
+    console.log('translator initialized');
   } catch (error) {
-    console.error('translator initial fail:', error);
-    updateSubtitleText(subtitleContainer, "translator initial fail.");
+    console.error('translator initialization failed:', error);
+    updateSubtitleText(subtitleContainer, "Translation service unavailable.", true);
     return;
   }
 
   const tarLang = await new Promise((resolve) => {
     chrome.storage.local.get(['tarlang'], (result) => {
-      resolve(result.tarlang);
+      resolve(result.tarlang || 'english');
     });
   });
 
   const level = await new Promise((resolve) => {
     chrome.storage.local.get(['level'], (result) => {
-      resolve(result.level);
+      resolve(result.level || 'intermediate');
     });
   });
 
-  const prompt = `I'm trying to ${tarLang}, please translate the subtitle in ${tarLang} into English.
-        Difficulty level: ${level}
-        Requirements:
-        - Provide only the English translation
-        - No explanations or alternatives
-        - Adjust translation to ${level} level learners
-        
-        Original text: "${currentSubtitle.text}"`;
-
   try {
-    const result = await session.prompt(prompt);
+    const prompt = `Translate to ${tarLang}:
+      Level: ${level}
+      Requirements:
+      - Only provide the direct translation
+      - No explanations or alternatives
+      - Match the ${level} proficiency level
+      
+      Text: "${currentSubtitle.text}"`;
+
+    const result = await session.prompt(prompt, { 
+      language: 'en',
+      safetySettings: [
+        {
+          category: 'hate',
+          threshold: 'block_none'
+        },
+        {
+          category: 'harassment',
+          threshold: 'block_none'
+        }
+      ]
+    });
+    
     const translatedText = result.trim();
     updateSubtitleText(subtitleContainer, translatedText, true);
     console.log("Translation completed:", translatedText);
   } catch (error) {
-    console.error("translation error", error);
-    updateSubtitleText(subtitleContainer, "fail to translate" + error.message);
+    console.error("Translation error:", error);
+    updateSubtitleText(subtitleContainer, "Translation failed: " + error.message, true);
   } finally {
-    session.destroy?.();
+    session?.destroy?.();
   }
 }
 
