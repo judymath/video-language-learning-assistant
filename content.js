@@ -578,13 +578,20 @@ async function handleTranslation() {
 
   console.log(`try to translate: ${currentSubtitle.text}`);
 
-  const tarLang = await new Promise((resolve) => {
+  let tarLang = await new Promise((resolve) => {
     chrome.storage.local.get(['tarlang'], (result) => {
       resolve(result.tarlang || 'english');
     });
   });
 
-  if (tarLang=='french') tarLang='fr';
+  const langMap = {
+    english: 'en',
+    french: 'fr',
+    spanish: 'es',
+    german: 'de'
+  };
+  tarLang = langMap[tarLang.toLowerCase()] || 'en';
+  console.log(`tarlang: ${tarLang}`)
 
   const level = await new Promise((resolve) => {
     chrome.storage.local.get(['level'], (result) => {
