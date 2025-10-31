@@ -1,7 +1,7 @@
 # LinguaLoop — Chrome Extension 
 
 **Stop skimming. Start looping.** LinguaLoop turns YouTube into a language-immersion workspace—tailored for **intermediate learners**.  
-Install the extension, choose your language and CEFR level, and activate on-device AI with **Chrome’s Built-in AI / Gemini Nano**(Prompt API, Translator API) and **Gemini API key**（only for generate subtitles).
+Install the extension, choose your language and CEFR level, and activate on-device AI with **Chrome’s Built-in AI / Gemini Nano**(Prompt API) and **Gemini API key**（only for generate subtitles).
 
 > **Privacy first:** When on-device AI is available/enabled, your learning data (what you save, how you study) stays on your device.
 
