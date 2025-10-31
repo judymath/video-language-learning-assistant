@@ -558,7 +558,6 @@ function handleGoToPreviousSentence() {
   }
 }
 
-
 async function handleTranslation() {
   console.log("translating subtitle");
   if (!videoPlayer || !currentSubtitles.length) {
@@ -571,61 +570,58 @@ async function handleTranslation() {
     (s) => currentTime >= s.startTime && currentTime <= s.endTime
   );
 
-  if (!currentSubtitle) {
-    console.log("No subtitle found at current time");
+  console.log(`try to translate: ${currentSubtitle.text}`);
+  let session;
+  try {
+    if (!('LanguageModel' in window)) {
+      throw new Error('LanguageModel API unavailable');
+    }
+
+    const availability = await LanguageModel.availability();
+    console.log('Gemini Nano:', availability);
+
+    if (availability === 'unavailable') {
+      throw new Error('Gemini Nano unavailable');
+    }
+
+    session = await LanguageModel.create();
+    console.log('translator initial success');
+  } catch (error) {
+    console.error('translator initial fail:', error);
+    updateSubtitleText(subtitleContainer, "translator initial fail.");
     return;
   }
 
-  console.log(`try to translate: ${currentSubtitle.text}`);
-
-  let tarLang = await new Promise((resolve) => {
+  const tarLang = await new Promise((resolve) => {
     chrome.storage.local.get(['tarlang'], (result) => {
-      resolve(result.tarlang || 'english');
+      resolve(result.tarlang);
+    });
+  });
+  const level = await new Promise((resolve) => {
+    chrome.storage.local.get(['level'], (result) => {
+      resolve(result.level);
     });
   });
 
-  const langMap = {
-    english: 'en',
-    french: 'fr',
-    spanish: 'es',
-    german: 'de'
-  };
-  tarLang = langMap[tarLang.toLowerCase()] || 'en';
-  console.log(`tarLang: ${tarLang}`);
-
-  let session;
-  try {
-    if (!('Translator' in window)) {
-      throw new Error('Translator API unavailable');
-    }
-
-    const translatorCapabilities = await Translator.availability({
-      sourceLanguage: tarLang,
-      targetLanguage: 'en'
-    });
-    console.log('Translator availability:', translatorCapabilities);
-
-    if (translatorCapabilities !== 'available') {
-      throw new Error('Translator unavailable');
-    }
-
-    session = await Translator.create();
-    console.log('translator initialized');
-  } catch (error) {
-    console.error('translator initialization failed:', error);
-    updateSubtitleText(subtitleContainer, "Translation service unavailable.", true);
-    return;
-  }
+  const prompt = `I'm trying to ${tarLang}, please translate the subtitle in ${tarLang} into English.
+        Difficulty level: ${level}
+        Requirements:
+        - Provide only the English translation
+        - No explanations or alternatives
+        - Adjust translation to ${level} level learners
+        
+        Original text: "${currentSubtitle.text}"`;
 
   try {
-    const translatedSubtitle = await session.translate(currentSubtitle.text);
-    updateSubtitleText(subtitleContainer, translatedSubtitle, true);
-    console.log("Translation completed:", translatedSubtitle);
+    const result = await session.prompt(prompt);
+    const translatedText = result.trim();
+    updateSubtitleText(subtitleContainer, translatedText, true);
+    console.log("Translation completed:", translatedText);
   } catch (error) {
-    console.error("Translation error:", error);
-    updateSubtitleText(subtitleContainer, "Translation failed: " + error.message, true);
+    console.error("translation error", error);
+    updateSubtitleText(subtitleContainer, "fail to translate" + error.message);
   } finally {
-    session?.destroy?.();
+    session.destroy?.();
   }
 }
 
