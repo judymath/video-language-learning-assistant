@@ -303,219 +303,219 @@ async function fetchSubtitlesFromGemini(videoUrl, apiKey, tabId) {
   return parsedSubtitles;
 }
 
-async function translateWithGemini(text, apiKey) {
-    try {
-      // Debug logging
-      console.log("Starting translation request...");
-      // Get stored language and level preferences
-      const result = await chrome.storage.local.get(["tarlang", "level"]);
-      const sourceLanguage = result.tarlang || "french"; // Default to french if not set
-      const level = result.level || "intermediate"; // Default to intermediate if not set
-      // Create source language-specific prompts
-      const sourceLanguagePrompts = {
-        german: "Please translate the following German text to English",
-        portuguese: "Please translate the following Portuguese text to English",
-        spanish: "Please translate the following Spanish text to English",
-        french: "Please translate the following French text to English"
-      };
+// async function translateWithGemini(text, apiKey) {
+//     try {
+//       // Debug logging
+//       console.log("Starting translation request...");
+//       // Get stored language and level preferences
+//       const result = await chrome.storage.local.get(["tarlang", "level"]);
+//       const sourceLanguage = result.tarlang || "french"; // Default to french if not set
+//       const level = result.level || "intermediate"; // Default to intermediate if not set
+//       // Create source language-specific prompts
+//       const sourceLanguagePrompts = {
+//         german: "Please translate the following German text to English",
+//         portuguese: "Please translate the following Portuguese text to English",
+//         spanish: "Please translate the following Spanish text to English",
+//         french: "Please translate the following French text to English"
+//       };
 
-      const prompt = `${sourceLanguagePrompts[sourceLanguage] || sourceLanguagePrompts.french}
-        Difficulty level: ${level}
-        Requirements:
-        - Provide only the English translation
-        - No explanations or alternatives
-        - Adjust translation to ${level} level learners
+//       const prompt = `${sourceLanguagePrompts[sourceLanguage] || sourceLanguagePrompts.french}
+//         Difficulty level: ${level}
+//         Requirements:
+//         - Provide only the English translation
+//         - No explanations or alternatives
+//         - Adjust translation to ${level} level learners
         
-        Original text: "${text}"`;
-      // Validate API key
-      if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10) {
-        throw new Error("Invalid API key format");
-      }
+//         Original text: "${text}"`;
+//       // Validate API key
+//       if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10) {
+//         throw new Error("Invalid API key format");
+//       }
   
-      const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + apiKey;
+//       const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + apiKey;
       
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }]
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            topP: 0.8
-          }
-        })
-      });
+//       const response = await fetch(endpoint, {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json'
+//         },
+//         body: JSON.stringify({
+//           contents: [{
+//             parts: [{ text: prompt }]
+//           }],
+//           generationConfig: {
+//             temperature: 0.1,
+//             topP: 0.8
+//           }
+//         })
+//       });
   
-      console.log("API Response Status:", response.status);
+//       console.log("API Response Status:", response.status);
   
-      if (response.status === 401) {
-        throw new Error("Invalid API key");
-      }
+//       if (response.status === 401) {
+//         throw new Error("Invalid API key");
+//       }
   
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error("API Error Details:", errorData);
-        throw new Error(`API request failed: ${response.status}`);
-      }
+//       if (!response.ok) {
+//         const errorData = await response.text();
+//         console.error("API Error Details:", errorData);
+//         throw new Error(`API request failed: ${response.status}`);
+//       }
   
-      const data = await response.json();
-      if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
-        throw new Error("Invalid response format");
-      }
+//       const data = await response.json();
+//       if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+//         throw new Error("Invalid response format");
+//       }
   
-      return {
-        success: true,
-        translation: data.candidates[0].content.parts[0].text
-      };
-    } catch (error) {
-      console.error('Translation error:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
+//       return {
+//         success: true,
+//         translation: data.candidates[0].content.parts[0].text
+//       };
+//     } catch (error) {
+//       console.error('Translation error:', error);
+//       return {
+//         success: false,
+//         error: error.message
+//       };
+//     }
+//   }
 
-  // Add new function for vocabulary extraction
-async function extractVocabularyWithGemini(text, apiKey) {
-    try {
-      const result = await chrome.storage.local.get(["tarlang", "level"]);
-      const sourceLanguage = result.tarlang || "french";
-      const level = result.level || "intermediate";
+//   // Add new function for vocabulary extraction
+// async function extractVocabularyWithGemini(text, apiKey) {
+//     try {
+//       const result = await chrome.storage.local.get(["tarlang", "level"]);
+//       const sourceLanguage = result.tarlang || "french";
+//       const level = result.level || "intermediate";
 
-      // Create source language-specific prompts
-      const sourceLanguagePrompts = {
-        german: "Extract key words from German and translate to English",
-        portuguese: "Extract key words from Portuguese and translate to English",
-        spanish: "Extract key words from Spanish and translate to English",
-        french: "Extract key words from French and translate to English"
-      };
+//       // Create source language-specific prompts
+//       const sourceLanguagePrompts = {
+//         german: "Extract key words from German and translate to English",
+//         portuguese: "Extract key words from Portuguese and translate to English",
+//         spanish: "Extract key words from Spanish and translate to English",
+//         french: "Extract key words from French and translate to English"
+//       };
 
-      const prompt = `${sourceLanguagePrompts[sourceLanguage] || sourceLanguagePrompts.chinese}
-        Requirements:
-        - Select words appropriate for ${level} level
-        - One word/phrase per line
-        - Use format: "original - English translation"
-        - No numbering or explanations
-        - No blank lines
-        - Select 3 important words for ${level} level learners
+//       const prompt = `${sourceLanguagePrompts[sourceLanguage] || sourceLanguagePrompts.chinese}
+//         Requirements:
+//         - Select words appropriate for ${level} level
+//         - One word/phrase per line
+//         - Use format: "original - English translation"
+//         - No numbering or explanations
+//         - No blank lines
+//         - Select 3 important words for ${level} level learners
         
-        Original text: "${text}"`;
-      const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + apiKey;
+//         Original text: "${text}"`;
+//       const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + apiKey;
       
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }]
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            topP: 0.8,
-            maxOutputTokens: 1024
-          }
-        })
-      });
+//       const response = await fetch(endpoint, {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json'
+//         },
+//         body: JSON.stringify({
+//           contents: [{
+//             parts: [{ text: prompt }]
+//           }],
+//           generationConfig: {
+//             temperature: 0.1,
+//             topP: 0.8,
+//             maxOutputTokens: 1024
+//           }
+//         })
+//       });
   
-      console.log("Vocab API Response Status:", response.status);
+//       console.log("Vocab API Response Status:", response.status);
   
-      if (response.status === 401) {
-        throw new Error("Invalid API key");
-      }
+//       if (response.status === 401) {
+//         throw new Error("Invalid API key");
+//       }
   
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error("API Error Details:", errorData);
-        throw new Error(`API request failed: ${response.status}`);
-      }
+//       if (!response.ok) {
+//         const errorData = await response.text();
+//         console.error("API Error Details:", errorData);
+//         throw new Error(`API request failed: ${response.status}`);
+//       }
   
-      const data = await response.json();
-      return {
-        success: true,
-        vocabulary: data.candidates[0].content.parts[0].text
-      };
-    } catch (error) {
-      console.error('Vocabulary extraction error:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
+//       const data = await response.json();
+//       return {
+//         success: true,
+//         vocabulary: data.candidates[0].content.parts[0].text
+//       };
+//     } catch (error) {
+//       console.error('Vocabulary extraction error:', error);
+//       return {
+//         success: false,
+//         error: error.message
+//       };
+//     }
+//   }
 
-// generate ai example for new words
-async function generateExampleSentence(text, apiKey) {
-  try {
-    // Debug logging
-    console.log(`Starting generating sentence for: ${text}`);
-    // Get stored language and level preferences
-    const result = await chrome.storage.local.get(["tarlang", "level"]);
-    const sourceLanguage = result.tarlang || "french"; // Default to french if not set
-    const level = result.level || "intermediate"; // Default to intermediate if not set
-    // Create prompts
-    const prompt = `
-      Please generate one short example sentence using the word "${text}" in ${sourceLanguage}.
-      Requirements:
-        - Provide only the example sentence
-        - No explanations or alternatives
-        - Adjust example sentence to ${level} level learners`;
+// // generate ai example for new words
+// async function generateExampleSentence(text, apiKey) {
+//   try {
+//     // Debug logging
+//     console.log(`Starting generating sentence for: ${text}`);
+//     // Get stored language and level preferences
+//     const result = await chrome.storage.local.get(["tarlang", "level"]);
+//     const sourceLanguage = result.tarlang || "french"; // Default to french if not set
+//     const level = result.level || "intermediate"; // Default to intermediate if not set
+//     // Create prompts
+//     const prompt = `
+//       Please generate one short example sentence using the word "${text}" in ${sourceLanguage}.
+//       Requirements:
+//         - Provide only the example sentence
+//         - No explanations or alternatives
+//         - Adjust example sentence to ${level} level learners`;
 
-    // Validate API key
-    if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10) {
-      throw new Error("Invalid API key format");
-    }
+//     // Validate API key
+//     if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10) {
+//       throw new Error("Invalid API key format");
+//     }
 
-    const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + apiKey;
+//     const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + apiKey;
     
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-          temperature: 0.1,
-          topP: 0.8
-        }
-      })
-    });
+//     const response = await fetch(endpoint, {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json'
+//       },
+//       body: JSON.stringify({
+//         contents: [{
+//           parts: [{ text: prompt }]
+//         }],
+//         generationConfig: {
+//           temperature: 0.1,
+//           topP: 0.8
+//         }
+//       })
+//     });
 
-    console.log("API Response Status:", response.status);
+//     console.log("API Response Status:", response.status);
 
-    if (response.status === 401) {
-      throw new Error("Invalid API key");
-    }
+//     if (response.status === 401) {
+//       throw new Error("Invalid API key");
+//     }
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("API Error Details:", errorData);
-      throw new Error(`API request failed: ${response.status}`);
-    }
+//     if (!response.ok) {
+//       const errorData = await response.text();
+//       console.error("API Error Details:", errorData);
+//       throw new Error(`API request failed: ${response.status}`);
+//     }
 
-    const data = await response.json();
-    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error("Invalid response format");
-    }
+//     const data = await response.json();
+//     if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+//       throw new Error("Invalid response format");
+//     }
 
-    return {
-      success: true,
-      sentence: data.candidates[0].content.parts[0].text
-    };
-  } catch (error) {
-    console.error('Generation error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
+//     return {
+//       success: true,
+//       sentence: data.candidates[0].content.parts[0].text
+//     };
+//   } catch (error) {
+//     console.error('Generation error:', error);
+//     return {
+//       success: false,
+//       error: error.message
+//     };
+//   }
+// }
