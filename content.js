@@ -578,6 +578,18 @@ async function handleTranslation() {
 
   console.log(`try to translate: ${currentSubtitle.text}`);
 
+  const tarLang = await new Promise((resolve) => {
+    chrome.storage.local.get(['tarlang'], (result) => {
+      resolve(result.tarlang || 'english');
+    });
+  });
+
+  const level = await new Promise((resolve) => {
+    chrome.storage.local.get(['level'], (result) => {
+      resolve(result.level || 'intermediate');
+    });
+  });
+
   let session;
   try {
     if (!('Translator' in window)) {
@@ -601,18 +613,6 @@ async function handleTranslation() {
     updateSubtitleText(subtitleContainer, "Translation service unavailable.", true);
     return;
   }
-
-  const tarLang = await new Promise((resolve) => {
-    chrome.storage.local.get(['tarlang'], (result) => {
-      resolve(result.tarlang || 'english');
-    });
-  });
-
-  const level = await new Promise((resolve) => {
-    chrome.storage.local.get(['level'], (result) => {
-      resolve(result.level || 'intermediate');
-    });
-  });
 
   try {
     const prompt = `Translate to ${tarLang}:
