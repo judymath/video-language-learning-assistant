@@ -24,7 +24,6 @@ Install the extension, choose your language and CEFR level, and (optionally) act
 - **Movable vocabulary pop-up**: translation + key-word highlighting suited to your level.
 - **Built-in translation** and **on-device keyword selection** (AI).
 - **One-click save** to a private, in-browser **Vocabulary Book** (review mode generates fresh example sentences).
-- **Keyboard shortcuts** for flow (Prev sentence / Repeat / Speed / Add word).
 - **Fixed-size UI** (no responsive/screen adaptation), matching the provided hi-fi mocks.
 
 ---
