@@ -591,13 +591,7 @@ async function handleTranslation() {
     german: 'de'
   };
   tarLang = langMap[tarLang.toLowerCase()] || 'en';
-  console.log(`tarlang: ${tarLang}`)
-
-  const level = await new Promise((resolve) => {
-    chrome.storage.local.get(['level'], (result) => {
-      resolve(result.level || 'intermediate');
-    });
-  });
+  console.log(`tarLang: ${tarLang}`);
 
   let session;
   try {
@@ -624,32 +618,9 @@ async function handleTranslation() {
   }
 
   try {
-    const prompt = `Translate to ${tarLang}:
-      Level: ${level}
-      Requirements:
-      - Only provide the direct translation
-      - No explanations or alternatives
-      - Match the ${level} proficiency level
-      
-      Text: "${currentSubtitle.text}"`;
-
-    const result = await session.translateText(prompt, { 
-      language: 'en',
-      safetySettings: [
-        {
-          category: 'hate',
-          threshold: 'block_none'
-        },
-        {
-          category: 'harassment',
-          threshold: 'block_none'
-        }
-      ]
-    });
-    
-    const translatedText = result.trim();
-    updateSubtitleText(subtitleContainer, translatedText, true);
-    console.log("Translation completed:", translatedText);
+    const translatedSubtitle = await session.translate(currentSubtitle.text);
+    updateSubtitleText(subtitleContainer, translatedSubtitle, true);
+    console.log("Translation completed:", translatedSubtitle);
   } catch (error) {
     console.error("Translation error:", error);
     updateSubtitleText(subtitleContainer, "Translation failed: " + error.message, true);
