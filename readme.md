@@ -65,7 +65,7 @@ Handles communication with the Gemini API and manages local storage for subtitle
 
 ### `content.js`
 
-Runs on YouTube pages to manage subtitle display. It listens for messages from the background script and popup, loads stored subtitles, operate single sentence loop, playback speed adjustment, reverse to previous sentence, save new words to notebook, vocabulary-based sentence generation, and full sentence translation.
+Runs on YouTube pages to manage display of interface. It listens for messages from the background script and popup, loads stored subtitles, operate single sentence loop, playback speed adjustment, reverse to previous sentence, save new words to notebook, vocabulary-based sentence generation, and full sentence translation.
 
 ### `popup.html`
 
