@@ -9,20 +9,19 @@ document.addEventListener("DOMContentLoaded", function () {
   const statusDiv = document.getElementById("status");
   const existingSubtitlesDiv = document.getElementById("existingSubtitles");
 
-  // 初始化页面逻辑
+  // init page
   chrome.storage.local.get(["geminiApiKey", "tarlang", "level"], function (result) {
     if (result.geminiApiKey && result.tarlang && result.level) {
-      // 已保存 -> 显示字幕页
+      // saved -> show subtitle
       profilePage.classList.add("hidden");
       subtitlePage.classList.remove("hidden");
     } else {
-      // 未保存 -> 显示设置页
+      // not saved -> show setting page
       profilePage.classList.remove("hidden");
       subtitlePage.classList.add("hidden");
     }
   });
 
-  // 保存设置按钮逻辑
   saveProfileBtn.addEventListener("click", () => {
     const tarlang = document.querySelector('input[name="tarlang"]:checked')?.value;
     const level = document.querySelector('input[name="level"]:checked')?.value;
@@ -40,7 +39,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
-  // 工具函数：清理 YouTube URL
+  // clean YouTube URL
   function cleanYouTubeUrl(originalUrl) {
     try {
       const url = new URL(originalUrl);
@@ -52,11 +51,11 @@ document.addEventListener("DOMContentLoaded", function () {
     return originalUrl;
   }
 
-  // 检查当前页面并显示悬浮窗
+  // check current and show floating window
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     const currentTab = tabs[0];
     if (currentTab && currentTab.url && currentTab.url.includes("youtube.com/watch")) {
-      // 在YouTube页面时，始终显示悬浮窗
+      // show floating window when in youtube page
       chrome.tabs.sendMessage(currentTab.id, { action: "showFloatingWindow" });
     }
   });
@@ -89,7 +88,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
   
-  // 生成字幕按钮逻辑
   generateBtn.addEventListener("click", function () {
     chrome.storage.local.get(["geminiApiKey"], function (result) {
       const apiKey = result.geminiApiKey?.trim();
@@ -128,7 +126,6 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
-  // 接收后台状态更新
   chrome.runtime.onMessage.addListener((message) => {
     if (message.action === "updatePopupStatus") {
       statusDiv.textContent = message.text;
