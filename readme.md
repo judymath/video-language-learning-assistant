@@ -103,7 +103,7 @@ Provides documentation for the project.
 
 ---
 
-# Credits and Attributions
+## Credits and Attributions
 
 This project uses code from the following open-source library:
 
